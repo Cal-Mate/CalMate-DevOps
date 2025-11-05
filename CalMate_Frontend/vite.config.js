@@ -14,5 +14,19 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
-  },
+  }, 
+  // server: {
+  //   proxy: {
+  //     '/api': {
+  //       target: 'http://localhost:8055', // 스프링 백엔드
+  //       changeOrigin: true,
+  //       rewrite: p => p.replace(/^\/api/, ''),
+  //     },
+  //     '/act': {
+  //       target: 'http://localhost:8055', // (옵션) actuator(관리포트) 프록시
+  //       changeOrigin: true,
+  //       rewrite: p => p.replace(/^\/act/, ''),
+  //     }
+  //   }
+  // }
 })
