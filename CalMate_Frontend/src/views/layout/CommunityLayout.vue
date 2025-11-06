@@ -19,6 +19,8 @@
   import { onMounted } from 'vue';
   import { useUserStore } from '@/stores/user';
     const userStore = useUserStore();
+    userStore.name
+    userStore.userId;
 
 </script>
 
