@@ -11,7 +11,7 @@
 
     <div class="user-card">
       <div class="user-avatar">
-        <img :src="basicProfile" alt="profile" />
+        <img :src="userStore.profile" alt="profile" />
       </div>
       <div class="user-info">
         <p class="user-name">
@@ -227,8 +227,8 @@ async function handleLogout() {
 }
 
 .user-avatar img {
-  width: 24px;
-  height: 24px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   object-fit: cover;
 }
@@ -237,6 +237,7 @@ async function handleLogout() {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  margin-left : 1em;
 }
 
 .user-name {

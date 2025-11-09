@@ -17,11 +17,12 @@ export const useUserStore = defineStore(
     const nickname      = ref('');
     const weight        = ref(0.0);
     const height        = ref(0.0);
+    const bodyMetric    = ref(0);
     
     // ----- Actions -----
     function logIn(
       { userName, userEmail, profilePath, authorities, userId : uid, nickname :nick ,
-       weight : in_weight, height : in_height
+       weight : in_weight, height : in_height, bodyMetric : body_metric
       }
   ) {
       // console.log('asd',in_weight)
@@ -34,6 +35,7 @@ export const useUserStore = defineStore(
       isLoggedIn.value = true;
       weight.value = in_weight;
       height.value = in_height;
+      bodyMetric.value = body_metric;
     }
 
     
@@ -48,6 +50,7 @@ export const useUserStore = defineStore(
       isLoggedIn.value = false
       weight.value = 0;
       height.value = 0;
+      bodyMetric.value = 0;
     }
 
     function setToken(jwtToken) {
@@ -62,7 +65,7 @@ export const useUserStore = defineStore(
     return {
       // 외부 노출용 readonly state
       name, email, roles, profile, token, isLoggedIn, userId,nickname,
-      weight, height,
+      weight, height, bodyMetric,
       // actions
       logIn, logOut, changeProfile , setToken
     }
@@ -76,6 +79,7 @@ export const useUserStore = defineStore(
         'email',
         'roles',
         'profile',
+        'bodyMetric',
         'token',
         'isLoggedIn',
         'userId',

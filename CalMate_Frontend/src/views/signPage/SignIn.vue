@@ -52,7 +52,7 @@
 
         <p class="signup">
           <span class="signup_text">아직 계정이 없으신가요?</span>
-          <button type="button" class="link">회원가입</button>
+          <button type="button" class="link" @click="onClick">회원가입</button>
         </p>
       </form>
     </div>
@@ -82,12 +82,16 @@ async function signIn() {
                   headers: { 'Content-Type': 'application/json' }
               });
 
+    const token = response.headers['token']; 
+    console.log('token:\n',token);
+    console.log('response:\n',response.headers);
     console.log('response:\n',response);
     console.log('data:\n',response.data);
     
     const { success, code, message, user, extra } = response.data;
     
     console.log('user:\n',user);
+    userStore.setToken(token);
     userStore.logIn(user);
 
     
@@ -115,6 +119,10 @@ async function signIn() {
           console.error('❌ 요청 설정 중 오류:', error.message);
       }
   }
+}
+
+const onClick = () => {
+  router.push('/sign/signUp');
 }
 
 </script>

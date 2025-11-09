@@ -70,7 +70,7 @@
       <div class="triple">
         <div class="triple__col">
           <p class="triple__label">기초대사량 (BMR)</p>
-          <p class="triple__value">1674 kcal</p>
+          <p class="triple__value">{{ userStore.bodyMetric }} kcal</p>
         </div>
         <div class="triple__col">
           <p class="triple__label">일일 소모 칼로리 (TDEE)</p>
@@ -78,7 +78,7 @@
         </div>
         <div class="triple__col">
           <p class="triple__label">현재 체중</p>
-          <p class="triple__value">75 kg</p>
+          <p class="triple__value">{{ userStore.weight }} kg</p>
         </div>
       </div>
     </section>
@@ -114,11 +114,12 @@ import ProgressBar from '@/components/ProgressBar.vue'
 import KpiCard from '@/components/KpiCard.vue'       
 import MealCard from '@/components/MealCard.vue'     
 import { useUserStore } from '@/stores/user'
-const userStore = useUserStore();
+import api from '@/lib/api'
 
+const userStore = useUserStore();
 const netKcal = computed(() => 650)
 const goalKcal = 2095
-
+api.get('/health')
 
 </script>
 
