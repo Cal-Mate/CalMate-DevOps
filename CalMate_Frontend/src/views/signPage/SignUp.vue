@@ -1,204 +1,230 @@
 <template>
-  <!--
-    전체 가입 카드
-    - 폭은 적당히 줄이고 가운데 정렬
-  -->
+  <!-- 화면 중앙 정렬 -->
   <div class="auth-page">
     <section class="card-wrap">
-        <!-- 상단 로고/타이틀 영역 -->
-        <header class="head">
+      <!-- 상단 로고/타이틀 -->
+      <header class="head">
         <div class="logo">🍽️</div>
         <h1 class="title">회원가입</h1>
         <p class="subtitle">건강한 식단 관리를 시작해보세요</p>
-        </header>
+      </header>
 
-        <!-- 실제 폼 -->
-        <form class="grid" @submit.prevent="handleSubmit">
-        <!-- ===== 1열: 이름 ===== -->
+      <!-- 2열 폼 -->
+      <form class="grid" @submit.prevent="handleSubmit">
+        <!-- 이름 -->
         <div class="field">
-            <label class="label">이름 <span class="req">*</span></label>
-            <input
+          <label class="label">이름 <span class="req">*</span></label>
+          <input
             class="input"
+            name="name"
             type="text"
             placeholder="홍길동"
             v-model.trim="form.name"
             @blur="validate('name')"
-            />
-            <p v-if="errors.name" class="error">{{ errors.name }}</p>
+          />
+          <p  class="error">{{ errors.name || ''}}</p>
         </div>
 
-        <!-- ===== 2열: 이메일 ===== -->
+        <!-- 닉네임 -->
         <div class="field">
-            <label class="label">이메일 <span class="req">*</span></label>
-            <input
+          <label class="label">닉네임 </label>
+          <input
             class="input"
+            name="nickname"
+            type="text"
+            placeholder="먹보"
+            v-model.trim="form.nickname"
+          />
+          <p  class="error">{{''}}</p>
+        </div>
+
+        <!-- 이메일 -->
+        <div class="field">
+          <label class="label">이메일 <span class="req">*</span></label>
+          <input
+            class="input"
+            name="email"
             type="email"
             placeholder="your@email.com"
             v-model.trim="form.email"
             @blur="validate('email')"
-            />
-            <p v-if="errors.email" class="error">{{ errors.email }}</p>
+            autocomplete="email"
+          />
+          <p  class="error">{{ errors.email || '' }}</p>
         </div>
 
-        <!-- ===== 1열: 비밀번호 ===== -->
+        <!-- 비밀번호 -->
         <div class="field">
-            <label class="label">비밀번호 <span class="req">*</span></label>
-            <input
+          <label class="label">비밀번호 <span class="req">*</span></label>
+          <input
             class="input"
+            name="password"
             type="password"
-            placeholder="최소 8자 이상"
+            placeholder="최소 6자 이상"
             v-model="form.password"
             @blur="validate('password')"
-            />
-            <p v-if="errors.password" class="error">{{ errors.password }}</p>
+            autocomplete="new-password"
+          />
+          <p  class="error">{{ errors.password || '' }}</p>
         </div>
 
-        <!-- ===== 2열: 비밀번호 확인 ===== -->
+        <!-- 비밀번호 확인 -->
         <div class="field">
-            <label class="label">비밀번호 확인 <span class="req">*</span></label>
-            <input
+          <label class="label">비밀번호 확인 <span class="req">*</span></label>
+          <input
             class="input"
+            name="passwordConfirm"
             type="password"
             placeholder="비밀번호 재입력"
             v-model="form.passwordConfirm"
             @blur="validate('passwordConfirm')"
-            />
-            <p v-if="errors.passwordConfirm" class="error">{{ errors.passwordConfirm }}</p>
+            autocomplete="new-password"
+          />
+          <p class="error">{{ errors.passwordConfirm || '' }}</p>
         </div>
 
-        <!-- ===== 1열: 전화번호 ===== -->
+        <!-- 전화번호 -->
         <div class="field">
-            <label class="label">전화번호 <span class="req">*</span></label>
-            <input
+          <label class="label">전화번호 <span class="req">*</span></label>
+          <input
             class="input"
+            name="phone"
             type="tel"
             placeholder="010-1234-5678"
             v-model.trim="form.phone"
             @blur="validate('phone')"
-            />
-            <p v-if="errors.phone" class="error">{{ errors.phone }}</p>
+            autocomplete="tel"
+          />
+          <p class="error">{{ errors.phone || '' }}</p>
         </div>
 
-        <!-- ===== 2열: 생년월일 ===== -->
+        <!-- 생년월일 -->
         <div class="field">
-            <label class="label">생년월일 <span class="req">*</span></label>
-            <input
+          <label class="label">생년월일 <span class="req">*</span></label>
+          <input
             class="input"
+            name="birth"
             type="date"
             v-model="form.birth"
             @blur="validate('birth')"
-            />
-            <p v-if="errors.birth" class="error">{{ errors.birth }}</p>
+          />
+          <p  class="error">{{ errors.birth || '' }}</p>
         </div>
 
-        <!-- ===== 1열: 성별 ===== -->
+        <!-- 성별 -->
         <div class="field">
-            <label class="label">성별 <span class="req">*</span></label>
-            <select class="input" v-model="form.gender" @blur="validate('gender')">
-            <option value="" disabled>선택하세요</option>
-            <option value="male">남성</option>
-            <option value="female">여성</option>
-            <option value="other">기타</option>
-            </select>
-            <p v-if="errors.gender" class="error">{{ errors.gender }}</p>
-        </div>
-
-        <!-- ===== 2열: 키(cm) ===== -->
-        <div class="field">
-            <label class="label">키(cm) <span class="req">*</span></label>
-            <input
+          <label class="label">성별 <span class="req">*</span></label>
+          <select
             class="input"
+            name="gender"
+            v-model="form.gender"
+            @blur="validate('gender')"
+          >
+            <option value="" disabled>선택하세요</option>
+            <option value="M">남성</option>
+            <option value="F">여성</option>
+          </select>
+          <p  class="error">{{ errors.gender  || ''}}</p>
+        </div>
+
+        <!-- 키 -->
+        <div class="field">
+          <label class="label">키(cm) <span class="req">*</span></label>
+          <input
+            class="input"
+            name="height"
             type="number"
             inputmode="decimal"
             placeholder="예: 175"
             v-model.number="form.height"
             @blur="validate('height')"
-            min="50"
-            max="250"
-            step="0.1"
-            />
-            <p v-if="errors.height" class="error">{{ errors.height }}</p>
+            min="50" max="250" step="0.1"
+          />
+          <p  class="error">{{ errors.height || '' }}</p>
         </div>
 
-        <!-- ===== 1열: 몸무게(kg) ===== -->
+        <!-- 몸무게 -->
         <div class="field">
-            <label class="label">몸무게(kg) <span class="req">*</span></label>
-            <input
+          <label class="label">몸무게(kg) <span class="req">*</span></label>
+          <input
             class="input"
+            name="weight"
             type="number"
             inputmode="decimal"
             placeholder="예: 68"
             v-model.number="form.weight"
             @blur="validate('weight')"
-            min="20"
-            max="400"
-            step="0.1"
-            />
-            <p v-if="errors.weight" class="error">{{ errors.weight }}</p>
+            min="20" max="400" step="0.1"
+          />
+          <p  class="error">{{ errors.weight || '' }}</p>
         </div>
 
-        <!-- ===== 2열: 기초대사량(BMR, kcal) ===== -->
+        <!-- BMR -->
         <div class="field">
-            <label class="label">
-            기초대사량(BMR, kcal) <span class="req">*</span>
-            </label>
-            <div class="bmr-row">
+          <label class="label">기초대사량(BMR, kcal) <span class="req">*</span></label>
+          <div class="bmr-row">
             <input
-                class="input"
-                type="number"
-                inputmode="numeric"
-                placeholder="예: 1674"
-                v-model.number="form.bmr"
-                @blur="validate('bmr')"
-                min="500"
-                max="5000"
-                step="1"
+              class="input"
+              name="bmr"
+              type="number"
+              inputmode="numeric"
+              placeholder="예: 1674"
+              v-model.number="form.bmr"
+              @blur="validate('bmr')"
+              min="500" max="5000" step="1"
             />
             <button class="btn ghost" type="button" @click="autoCalcBMR">
-                자동 계산
+              자동 계산
             </button>
-            </div>
-            <p v-if="errors.bmr" class="error">{{ errors.bmr }}</p>
-            <p class="helper">※ 자동 계산은 Mifflin-St Jeor 공식을 사용합니다.</p>
+          </div>
+          <p class="error">{{ errors.bmr || '' }}</p>
+          <p class="helper">※ 자동 계산은 Mifflin-St Jeor 공식을 사용합니다.</p>
         </div>
 
-        <!-- ===== 전체 폭: 제출 버튼 ===== -->
+        <!-- 제출 -->
         <div class="field span-2">
-            <button class="btn primary" type="submit">다음 단계</button>
+          <button class="btn primary" type="submit" :disabled="submitting">
+            다음 단계
+          </button>
         </div>
-        </form>
+      </form>
 
-        <!-- 하단 링크 -->
-        <footer class="foot">
+      <!-- 하단 링크 -->
+      <footer class="foot">
         이미 계정이 있으신가요?
-        <a href="javascript:void(0)" @click="$emit('toLogin')">로그인</a>
-        </footer>
+        <RouterLink to="/sign/signIn">로그인</RouterLink>
+        <!-- <a href="javascript:void(0)" @click="$emit('toLogin')">로그인</a> -->
+      </footer>
     </section>
   </div>
 </template>
 
 <script setup>
 import { reactive } from 'vue'
+import api from '@/lib/api'
+import { RouterLink, useRouter } from 'vue-router'
+
+const router = useRouter();
 
 /* ---------------------------
- * 1) 양식 데이터 상태
+ * 1) 폼 상태
  * --------------------------- */
 const form = reactive({
-  name: '',
-  email: '',
-  password: '',
-  passwordConfirm: '',
-  phone: '',
-  birth: '',
-  gender: '',
-  height: null, // cm
-  weight: null, // kg
-  bmr: null     // kcal
+  name: '강형규10',
+  nickname: '',
+  email: 'k10@gmail.com',
+  password: 'pw1234!',
+  passwordConfirm: 'pw1234!',
+  phone: '010-0000-0000',
+  birth: '1992-04-12',
+  gender: 'M',
+  height: 183,
+  weight: 90,
+  bmr: 2000
 })
 
 /* ---------------------------
- * 2) 에러 메시지 상태
- *    (필드명과 동일 키)
+ * 2) 에러 상태 (필드명과 동일 키)
  * --------------------------- */
 const errors = reactive({
   name: '',
@@ -214,9 +240,7 @@ const errors = reactive({
 })
 
 /* ---------------------------
- * 3) 유효성 검사 규칙
- *    - 간단/직관적인 규칙으로 구성
- *    - 메시지는 요구사항대로 붉은색으로 표시
+ * 3) 검증 규칙
  * --------------------------- */
 const rules = {
   name(v) {
@@ -229,9 +253,11 @@ const rules = {
     const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
     return ok ? '' : '올바른 이메일 형식이 아닙니다.'
   },
-  password(v) {
+  password(v,all) {
     if (!v) return '비밀번호를 입력하세요.'
-    if (v.length < 8) return '비밀번호는 최소 8자 이상이어야 합니다.'
+    if (v.length < 6) return '비밀번호는 최소 6자 이상이어야 합니다.'
+    if (all.passwordConfirm.length > 0 ) 
+      errors.passwordConfirm = rules.passwordConfirm(all.passwordConfirm,all);
     return ''
   },
   passwordConfirm(v, all) {
@@ -246,6 +272,11 @@ const rules = {
   },
   birth(v) {
     if (!v) return '생년월일을 선택하세요.'
+    // 미래 날짜 방지
+    const d = new Date(v)
+    const today = new Date()
+    if (Number.isNaN(d.getTime())) return '날짜 형식이 올바르지 않습니다.'
+    if (d > today) return '생년월일은 오늘 이전이어야 합니다.'
     return ''
   },
   gender(v) {
@@ -253,17 +284,17 @@ const rules = {
     return ''
   },
   height(v) {
-    if (v === null || v === undefined || v === '') return '키를 입력하세요.'
+    if (v === null || v === '' || v === undefined) return '키를 입력하세요.'
     if (Number(v) < 50 || Number(v) > 250) return '키는 50~250cm 사이여야 합니다.'
     return ''
   },
   weight(v) {
-    if (v === null || v === undefined || v === '') return '몸무게를 입력하세요.'
+    if (v === null || v === '' || v === undefined) return '몸무게를 입력하세요.'
     if (Number(v) < 20 || Number(v) > 400) return '몸무게는 20~400kg 사이여야 합니다.'
     return ''
   },
   bmr(v) {
-    if (v === null || v === undefined || v === '') return 'BMR을 입력하거나 자동 계산을 눌러주세요.'
+    if (v === null || v === '' || v === undefined) return 'BMR을 입력하거나 자동 계산을 눌러주세요.'
     if (Number(v) < 500 || Number(v) > 5000) return 'BMR은 500~5000kcal 사이여야 합니다.'
     return ''
   }
@@ -273,27 +304,23 @@ const rules = {
  * 4) 단일 필드 검사
  * --------------------------- */
 function validate(key) {
-  // 규칙 함수가 있다면 실행 → 해당 에러 메시지 저장
   if (rules[key]) {
     errors[key] = rules[key](form[key], form)
   }
 }
 
 /* ---------------------------
- * 5) 전체 폼 검사
+ * 5) 전체 검사
  * --------------------------- */
 function validateAll() {
   Object.keys(rules).forEach((k) => validate(k))
-  // 에러가 하나라도 있으면 false
   return !Object.values(errors).some(Boolean)
 }
 
 /* ---------------------------
- * 6) BMR 자동 계산 (Mifflin-St Jeor)
- *    - 성별/키/몸무게/생년월일 필요
+ * 6) BMR 자동계산 (Mifflin-St Jeor)
  * --------------------------- */
 function autoCalcBMR() {
-  // 입력값 선검사 (간단 안내)
   const missing = []
   if (!form.gender) missing.push('성별')
   if (!form.height) missing.push('키')
@@ -304,39 +331,85 @@ function autoCalcBMR() {
     return
   }
 
-  // 나이 계산(만 나이)
   const today = new Date()
   const b = new Date(form.birth)
   let age = today.getFullYear() - b.getFullYear()
   const m = today.getMonth() - b.getMonth()
   if (m < 0 || (m === 0 && today.getDate() < b.getDate())) age--
 
-  // Mifflin-St Jeor (cm, kg, years)
-  const s = form.gender === 'male' ? 5 : -161
-  const bmr = 10 * Number(form.weight) + 6.25 * Number(form.height) - 5 * age + s
-
+  // 남성 +5, 여성 -161 (기타는 여성 기준으로 처리)
+  const sexAdj = form.gender === 'm' ? 5 : -161
+  const bmr = 10 * Number(form.weight) + 6.25 * Number(form.height) - 5 * age + sexAdj
   form.bmr = Math.round(bmr)
-  errors.bmr = '' // 성공 시 에러 제거
+  errors.bmr = ''
 }
 
 /* ---------------------------
- * 7) 제출 핸들러
+ * 7) 제출
  * --------------------------- */
-function handleSubmit() {
-  if (!validateAll()) {
-    // 최상단 첫 에러 위치로 스크롤 정도만 해주면 UX↑ (선택)
-    const firstErrKey = Object.keys(errors).find((k) => errors[k])
-    const firstEl = document.querySelector(`[name="${firstErrKey}"]`)
-    if (firstEl) firstEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    return
+let submitting = false
+async function handleSubmit() {
+try{
+    submitting = true
+    const response = 
+      await api.post('/member/member',
+      {
+          email       : form.email,
+          name        : form.name,
+          nickname    : form.nickname,
+          pw          : form.password,
+          phone       : form.phone,
+          birth       : form.birth,
+          gender      : form.gender,
+          height      : form.height,
+          weight      : form.weight,
+          bodyMetric  : form.bmr 
+
+      },
+      {
+          headers: { 'Content-Type': 'application/json' }
+      })
+
+    console.log('data:\n',response.data);
+    
+    // const { httpStatus, message,  result } = response.data;
+    
+    // console.log('user:\n',result.user);
+    // userStore.setToken(token);
+    // userStore.logIn(result.user);
+
+    
+    alert('회원 가입 완료');
+    router.push("/sign/signIn");
+
+    // if(result.user.authorities.some(x => x === 'ROLE_ADMIN')){
+    //     router.push("/main/dashboard");
+    // } else {
+    //     router.push("/main/dashboard");
+    // }
+    // openModal('회원 가입이 완료 되었습니다.','회원 가입', false ,true);
   }
-  // TODO: 실제 회원가입 API 호출
-  // await api.post('/auth/sign-up', form)
-  alert('검증 성공! 서버로 전송할 수 있습니다.')
+  catch (error)
+  {
+    console.log(error);
+    alert(error.response?.data.message);
+    // openModal(e.response.data.message,'회원 가입 실패', true);
+  }
+  finally {
+    submitting = false;
+  }
+
+
+
+
+
+
 }
 </script>
 
 <style scoped>
+/* --- 네가 준 CSS를 그대로 유지 --- */
+
 /* 카드 컨테이너 */
 .card-wrap{
   width: 760px;
@@ -384,6 +457,7 @@ function handleSubmit() {
   padding: 0 12px;
   font-size: 14px;
   transition: border-color .2s ease, background .2s ease, box-shadow .2s ease;
+  box-sizing: border-box; /* 겹침 방지 */
 }
 .input:focus{
   outline:none;
@@ -420,44 +494,26 @@ function handleSubmit() {
   margin-top: 12px; text-align:center; font-size: 13px; color:#6b7280;
 }
 .foot a{ color:#111827; text-decoration: underline; }
-/* ✅ 화면 중앙(가로+세로) 정렬 */
+
+/* 화면 중앙 정렬 */
 .auth-page{
-  min-height: 100vh;          /* 뷰포트 전체 높이 */
-  display: grid;              /* 중앙 정렬 */
-  place-items: center;        /* 가로/세로 동시에 중앙 */
-  padding: 24px 16px;         /* 좌우 여백 */
-  background: #f7f8fb;        /* (선택)淡배경 */
-}
-
-/* (기존 card-wrap는 그대로 두고 사용) */
-
-/* ✅ 인풋들 겹치지 않게 여백 확대 */
-.grid{
+  min-height: 100vh;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  column-gap: 18px;           /* 좌/우 칸 간격 */
-  row-gap: 16px;              /* 위/아래 칸 간격 (↑ 기존보다 살짝 키움) */
+  place-items: center;
+  padding: 24px 16px;
+  background: #f7f8fb;
 }
 
-/* ✅ 라벨/인풋/에러 간 간격 확보 */
-.field{
-  display: grid;
-  gap: 6px;                   /* 라벨 ↔ 인풋, 인풋 ↔ 에러 간격 */
-}
-
-/* ✅ 인풋 겹침 방지(박스 계산 안정화) */
-.input{
-  box-sizing: border-box;
-}
-
-/* (선택) 에러가 나타나도 레이아웃 들뜸 최소화 */
+/* 에러 문구 */
 .error{
   margin: 4px 2px 0;
   line-height: 1.3;
   color:red;
   font-size: 13px;
+  width : 15em;
+  height: 1.5em;
+  
 }
-
 
 /* 반응형 */
 @media (max-width: 640px){

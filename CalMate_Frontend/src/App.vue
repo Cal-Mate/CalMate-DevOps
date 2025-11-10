@@ -10,9 +10,11 @@
     import { RouterView } from 'vue-router';
     import { onMounted } from 'vue';
     import api from '@/lib/api'
-  import { useUserStore } from '@/stores/user';
-    const userStore = useUserStore();
+    import { useUserStore } from '@/stores/user';
 
+    const userStore = useUserStore();
+    
+    
     onMounted(async() => {
         const response = await api.get('/health');
         console.log(response);
@@ -21,5 +23,6 @@
         //아래와 같이 필요한 데이터가 있으면 접근해서 사용 하면 됨
         console.log('이름:',userStore.name);
         console.log('로그인상테:',userStore.isLoggedIn);
+        userStore.userId
     })
 </script>
