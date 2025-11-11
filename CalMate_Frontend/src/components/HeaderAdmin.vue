@@ -29,86 +29,22 @@
       @mouseleave="showSubmenu = false"
     >
       <ul class="menu">
-        <li
-          class="menu-item"
-          :class="{ active: isActive('/main/dashboard') }"
-        >
-          <RouterLink class="menu-link" to="/main/dashboard">
-            <img :src="dashBoardIcon" alt="" class="menu-icon" />
-            <span>대시보드</span>
-          </RouterLink>
-        </li>
-
         <li class="menu-item">
-          <RouterLink class="menu-link" to="#">
-            <img :src="aiIcon" alt="" class="menu-icon" />
-            <span>AI 추천</span>
+          <RouterLink class="menu-link" to="/admin/main-dashboard/dashboard">
+            <img :src="pointIcon" alt="" class="menu-icon" />
+            <span>관리자 페이지</span>
           </RouterLink>
         </li>
 
-        <li
+        <!-- <li
           class="menu-item"
-          :class="{ active: isActive('/main/dietmanagement') }"
+          :class="{ active: isActive('/community/board') }"
         >
-          <RouterLink class="menu-link" to="/main/dietmanagement">
-            <img :src="dietManagementIcon" alt="" class="menu-icon" />
-            <span>식단 관리</span>
-          </RouterLink>
-        </li>
-
-        <li
-          class="menu-item"
-          :class="{ active: isActive('/main/exercise') }"
-        >
-          <RouterLink class="menu-link" to="/main/exerciseRecords">
-            <img :src="exerciseRecordsIcon" alt="" class="menu-icon" />
-            <span>운동 기록</span>
-          </RouterLink>
-        </li>
-
-        <li class="menu-item"
-        :class="{ active: isActive('/main/diary') }"
-        >
-          <a class="menu-link" href="#" @click.prevent="goDiary">
-            <img :src="diaryIcon" alt="" class="menu-icon" />
-            <span>일기</span>
-          </a>
-        </li>
-
-        <li class="menu-item"
-        :class="{ active: isActive('/main/calendar') }"
-        >
-          <RouterLink class="menu-link" to="/main/calendar">
-            <img :src="calendarIcon" alt="" class="menu-icon" />
-            <span>캘린더</span>
-          </RouterLink>
-        </li>
-
-        <li
-          class="menu-item"
-          :class="{ active: isActive('/community') }"
-        >
-          <RouterLink class="menu-link" to="/community">
+          <RouterLink class="menu-link" to="/community/board">
             <img :src="communityIcon" alt="" class="menu-icon" />
             <span>커뮤니티</span>
           </RouterLink>
-        </li>
-
-        <li class="menu-item"
-            :class="{ active: isActive('/main/point') }"
-        >
-          <RouterLink class="menu-link" to="/main/point">
-            <img :src="pointIcon" alt="" class="menu-icon" />
-            <span>포인트</span>
-          </RouterLink>
-        </li>
-
-        <li class="menu-item">
-          <RouterLink class="menu-link" to="/main/profile">
-            <img :src="profileIcon" alt="" class="menu-icon" />
-            <span>프로필</span>
-          </RouterLink>
-        </li>
+        </li> -->
       </ul>
     </div>
 
@@ -140,18 +76,9 @@ import api from '@/lib/api'
 
 
 import mainIcon from '../assets/images/mainIcon.png'
-import basicProfile from '../assets/images/basicprofile.png'
-import dashBoardIcon from '../assets/images/header/dashBoard.png'
-import aiIcon from '../assets/images/header/ai.png'
-import dietManagementIcon from '../assets/images/header/dietManagement.png'
-import exerciseRecordsIcon from '../assets/images/header/exerciseRecords.png'
-import diaryIcon from '../assets/images/header/diary.png'
-import calendarIcon from '../assets/images/header/calendar.png'
 import communityIcon from '../assets/images/header/community.png'
 import pointIcon from '../assets/images/header/point.png'
-import profileIcon from '../assets/images/header/profile.png'
 import logoutIcon from '../assets/images/header/logout.png'
-import MenuExtention from './MenuExtention.vue'
 import ModalLogoutConfirm from '@/components/ModalLogoutConfirm.vue'
 
 const userStore = useUserStore()
@@ -169,19 +96,6 @@ async function handleLogout() {
   userStore.logOut();
   // console.log('로그아웃 실행!')
   await router.push('/sign/signIn')
-}
-
-function goDiary(){
-  const today = new Date()
-  const key = today.toISOString().split('T')[0]
-  let entries = []
-  try { entries = JSON.parse(localStorage.getItem('journalEntries') || '[]') } catch { entries = [] }
-  const exists = Array.isArray(entries) && entries.some(e => e?.date === key)
-  if (exists) {
-    router.push({ name: 'main-diary-done', query: { date: key } })
-  } else {
-    router.push({ name: 'main-diary', query: { date: key } })
-  }
 }
 
 </script>

@@ -84,24 +84,22 @@ async function signIn() {
 
     const token = response.headers['token']; 
     console.log('token:\n',token);
-    console.log('response:\n',response.headers);
-    console.log('response:\n',response);
     console.log('data:\n',response.data);
     
-    const { success, code, message, user, extra } = response.data;
+    const { httpStatus, message,  result } = response.data;
     
-    console.log('user:\n',user);
+    console.log('user:\n',result.user);
     userStore.setToken(token);
-    userStore.logIn(user);
+    userStore.logIn(result.user);
 
     
-    if(user.authorities.some(x => x === 'ROLE_ADMIN')){
-        router.push("/main/dashboard");
+    if(result.user.authorities.some(x => x === 'ROLE_ADMIN')){
+        router.push("/admin/main-dashboard");
     } else {
         router.push("/main/dashboard");
     }
   }
-  catch ( error)
+  catch (error)
   {
       // 에러 처리
       if (error.response) {

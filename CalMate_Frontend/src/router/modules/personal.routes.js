@@ -10,6 +10,11 @@ export default [
         component: () => import('@/views/defaultPage/DashBoard.vue'),
       },
       {
+        path: 'profile',
+        name: 'main-profile', 
+        component: () => import('@/views/defaultPage/ProfileSettings.vue'), // lazy
+      },
+      {
         path: 'qna',
         name: 'dashboard-qna-list',
         component: () => import('@/components/qna/QnaList.vue'),
