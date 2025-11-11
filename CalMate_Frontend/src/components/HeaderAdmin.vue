@@ -29,55 +29,14 @@
       @mouseleave="showSubmenu = false"
     >
       <ul class="menu">
-        <li
-          class="menu-item"
-          :class="{ active: isActive('/main/dashboard') }"
-        >
-          <RouterLink class="menu-link" to="/main/dashboard">
-            <img :src="dashBoardIcon" alt="" class="menu-icon" />
-            <span>대시보드</span>
-          </RouterLink>
-        </li>
-
         <li class="menu-item">
-          <RouterLink class="menu-link" to="#">
-            <img :src="aiIcon" alt="" class="menu-icon" />
-            <span>AI 추천</span>
+          <RouterLink class="menu-link" to="/admin/main-dashboard/dashboard">
+            <img :src="pointIcon" alt="" class="menu-icon" />
+            <span>관리자 페이지</span>
           </RouterLink>
         </li>
 
-        <li class="menu-item">
-          <RouterLink class="menu-link" to="#">
-            <img :src="dietManagementIcon" alt="" class="menu-icon" />
-            <span>식단 관리</span>
-          </RouterLink>
-        </li>
-
-        <li
-          class="menu-item"
-          :class="{ active: isActive('/main/exercise') }"
-        >
-          <RouterLink class="menu-link" to="#">
-            <img :src="exerciseRecordsIcon" alt="" class="menu-icon" />
-            <span>운동 기록</span>
-          </RouterLink>
-        </li>
-
-        <li class="menu-item">
-          <RouterLink class="menu-link" to="#">
-            <img :src="diaryIcon" alt="" class="menu-icon" />
-            <span>일기</span>
-          </RouterLink>
-        </li>
-
-        <li class="menu-item">
-          <RouterLink class="menu-link" to="#">
-            <img :src="calendarIcon" alt="" class="menu-icon" />
-            <span>캘린더</span>
-          </RouterLink>
-        </li>
-
-        <li
+        <!-- <li
           class="menu-item"
           :class="{ active: isActive('/community/board') }"
         >
@@ -85,21 +44,7 @@
             <img :src="communityIcon" alt="" class="menu-icon" />
             <span>커뮤니티</span>
           </RouterLink>
-        </li>
-
-        <li class="menu-item">
-          <RouterLink class="menu-link" to="#">
-            <img :src="pointIcon" alt="" class="menu-icon" />
-            <span>포인트</span>
-          </RouterLink>
-        </li>
-
-        <li class="menu-item">
-          <RouterLink class="menu-link" to="/main/profile">
-            <img :src="profileIcon" alt="" class="menu-icon" />
-            <span>프로필</span>
-          </RouterLink>
-        </li>
+        </li> -->
       </ul>
     </div>
 
@@ -131,16 +76,8 @@ import api from '@/lib/api'
 
 
 import mainIcon from '../assets/images/mainIcon.png'
-import basicProfile from '../assets/images/basicprofile.png'
-import dashBoardIcon from '../assets/images/header/dashBoard.png'
-import aiIcon from '../assets/images/header/ai.png'
-import dietManagementIcon from '../assets/images/header/dietManagement.png'
-import exerciseRecordsIcon from '../assets/images/header/exerciseRecords.png'
-import diaryIcon from '../assets/images/header/diary.png'
-import calendarIcon from '../assets/images/header/calendar.png'
 import communityIcon from '../assets/images/header/community.png'
 import pointIcon from '../assets/images/header/point.png'
-import profileIcon from '../assets/images/header/profile.png'
 import logoutIcon from '../assets/images/header/logout.png'
 import ModalLogoutConfirm from '@/components/ModalLogoutConfirm.vue'
 

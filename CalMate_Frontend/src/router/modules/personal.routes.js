@@ -9,7 +9,12 @@ export default [
         path: 'dashboard',
         name: 'main-dashboard', 
         component: () => import('@/views/defaultPage/DashBoard.vue'), // lazy
-      }
+      },
+      {
+        path: 'profile',
+        name: 'main-profile', 
+        component: () => import('@/views/defaultPage/ProfileSettings.vue'), // lazy
+      },
     ],
   },
 ];
