@@ -11,7 +11,7 @@
 
     <div class="user-card">
       <div class="user-avatar">
-        <img :src="basicProfile" alt="profile" />
+        <img :src="userStore.profile" alt="profile" />
       </div>
       <div class="user-info">
         <p class="user-name">
@@ -46,8 +46,11 @@
           </RouterLink>
         </li>
 
-        <li class="menu-item">
-          <RouterLink class="menu-link" to="#">
+        <li
+          class="menu-item"
+          :class="{ active: isActive('/main/dietmanagement') }"
+        >
+          <RouterLink class="menu-link" to="/main/dietmanagement">
             <img :src="dietManagementIcon" alt="" class="menu-icon" />
             <span>식단 관리</span>
           </RouterLink>
@@ -57,21 +60,25 @@
           class="menu-item"
           :class="{ active: isActive('/main/exercise') }"
         >
-          <RouterLink class="menu-link" to="#">
+          <RouterLink class="menu-link" to="/main/exerciseRecords">
             <img :src="exerciseRecordsIcon" alt="" class="menu-icon" />
             <span>운동 기록</span>
           </RouterLink>
         </li>
 
-        <li class="menu-item">
-          <RouterLink class="menu-link" to="#">
+        <li class="menu-item"
+        :class="{ active: isActive('/main/diary') }"
+        >
+          <a class="menu-link" href="#" @click.prevent="goDiary">
             <img :src="diaryIcon" alt="" class="menu-icon" />
             <span>일기</span>
-          </RouterLink>
+          </a>
         </li>
 
-        <li class="menu-item">
-          <RouterLink class="menu-link" to="#">
+        <li class="menu-item"
+        :class="{ active: isActive('/main/calendar') }"
+        >
+          <RouterLink class="menu-link" to="/main/calendar">
             <img :src="calendarIcon" alt="" class="menu-icon" />
             <span>캘린더</span>
           </RouterLink>
@@ -87,8 +94,10 @@
           </RouterLink>
         </li>
 
-        <li class="menu-item">
-          <RouterLink class="menu-link" to="#">
+        <li class="menu-item"
+            :class="{ active: isActive('/main/point') }"
+        >
+          <RouterLink class="menu-link" to="/main/point">
             <img :src="pointIcon" alt="" class="menu-icon" />
             <span>포인트</span>
           </RouterLink>
@@ -103,7 +112,7 @@
       </ul>
     </div>
 
-    <button class="logout-btn">
+    <button class="logout-btn" @click="open = true">
       <img :src="logoutIcon" alt="" class="logout-icon" />
       <span>로그아웃</span>
     </button>
@@ -114,12 +123,21 @@
       @mouseleave="showSubmenu = false"
     />
   </nav>
+
+  
+    <!-- v-model로 열기/닫기, confirm에서 실제 로그아웃 실행 -->
+  <ModalLogoutConfirm
+    v-model="open"
+    @confirm="handleLogout"
+  />
 </template>
 
 <script setup>
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ref } from 'vue'
 import { useUserStore } from '@/stores/user'
+import api from '@/lib/api'
+
 
 import mainIcon from '../assets/images/mainIcon.png'
 import basicProfile from '../assets/images/basicprofile.png'
@@ -133,12 +151,39 @@ import communityIcon from '../assets/images/header/community.png'
 import pointIcon from '../assets/images/header/point.png'
 import profileIcon from '../assets/images/header/profile.png'
 import logoutIcon from '../assets/images/header/logout.png'
+import MenuExtention from './MenuExtention.vue'
+import ModalLogoutConfirm from '@/components/ModalLogoutConfirm.vue'
 
 const userStore = useUserStore()
+
+const open = ref(false)
 const showSubmenu = ref(false)
 
 const route = useRoute()
+const router = useRouter();
 const isActive = (path) => route.path.startsWith(path)
+
+
+async function handleLogout() {
+  // await api.post('/auth/logout')
+  userStore.logOut();
+  // console.log('로그아웃 실행!')
+  await router.push('/sign/signIn')
+}
+
+function goDiary(){
+  const today = new Date()
+  const key = today.toISOString().split('T')[0]
+  let entries = []
+  try { entries = JSON.parse(localStorage.getItem('journalEntries') || '[]') } catch { entries = [] }
+  const exists = Array.isArray(entries) && entries.some(e => e?.date === key)
+  if (exists) {
+    router.push({ name: 'main-diary-done', query: { date: key } })
+  } else {
+    router.push({ name: 'main-diary', query: { date: key } })
+  }
+}
+
 </script>
 
 <style scoped>
@@ -205,8 +250,8 @@ const isActive = (path) => route.path.startsWith(path)
 }
 
 .user-avatar img {
-  width: 24px;
-  height: 24px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   object-fit: cover;
 }
@@ -215,6 +260,7 @@ const isActive = (path) => route.path.startsWith(path)
   display: flex;
   flex-direction: column;
   justify-content: center;
+  margin-left : 1em;
 }
 
 .user-name {
