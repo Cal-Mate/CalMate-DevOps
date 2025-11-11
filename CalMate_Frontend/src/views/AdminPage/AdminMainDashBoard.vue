@@ -33,7 +33,7 @@
         </template>
       </StatCard>
 
-      <StatCard title="신규 가입 (7일)" :value="kpi.newUsers7d" tone="cyan">
+      <StatCard title="신규 가입 (7일)" :value="kpi.newUseres" tone="cyan">
         <template #icon>
           <svg viewBox="0 0 24 24" class="icon"><path d="M15 14c2.67 0 8 1.34 8 4v2H7v-2c0-2.66 5.33-4 8-4zM15 2a5 5 0 010 10 5 5 0 010-10zM4 8H2V6h2V4h2v2h2v2H6v2H4V8z"/></svg>
         </template>
@@ -73,20 +73,21 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue'
+import { reactive , onMounted, ref} from 'vue'
 import { RouterView } from 'vue-router'
 import StatCard from '@/components/admin/StatCard.vue'
 import AdminTabs from '@/components/admin/AdminTabs.vue'
 import api from '@/lib/api'
+
 
 const kpi = reactive({
   totalUsers: 0,
   totalActive: 0,
   activeUsers: 0,
   activeRate: 0,
-  pendingReports: 2,
+  pendingReports: 0,
   pendingInquiries: 0,
-  newUsers7d: 0,
+  newUseres: 0,
   suspendedUsers: 0,
   blockedUsers: 0,
   totalPosts: 0,
@@ -101,6 +102,43 @@ const tabs = [
 ]
 
 // 대시보드 데이터 조회
+onMounted(async () =>  {
+  try{
+    const response = 
+      await api.get('/admin/dashboard');
+    
+    console.log(response.data);
+
+    const {result} = response.data;
+    
+    kpi.totalUsers = result.responseData.totalMembers;
+    kpi.totalActive = result.responseData.activeMembers;
+    kpi.blockedUsers = result.responseData.blockedMembers;
+    kpi.suspendedUsers = result.responseData.stopedMembers;
+    kpi.newUseres = result.responseData.newMembers;
+    console.log('123::::',result.responseData.totalMembers);
+
+  }
+  catch (error)
+  {
+      // // 에러 처리
+      // if (error.response) {
+      //     console.error('❌ 서버 오류 코드:', error.response.status);
+      //     console.error('❌ 오류 내용:', error.response.data);
+      //     const errorMessage = error.response.status >= 500 ? 
+      //     '서버 이상' : error.response.data.message;
+      //     openModal(errorMessage,'로그인 실패', true);
+      //     console.log('asdasd\n',errorMessage);
+      // } else if (error.request) {
+      //     // 요청은 갔지만 응답이 없을 때 (네트워크 문제 등)
+      //     console.error('❌ 응답 없음:', error.request);
+      // } else {
+      //     // 기타 오류
+      //     console.error('❌ 요청 설정 중 오류:', error.message);
+      // }
+  }
+})
+
 
 
 
