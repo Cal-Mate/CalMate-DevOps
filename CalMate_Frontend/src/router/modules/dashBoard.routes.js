@@ -3,17 +3,41 @@ export default [
     path: '/main',
     name: 'main',
     component: () => import('@/views/layout/DefaultLayout.vue'),
-    
     children: [
       {
         path: 'dashboard',
-        name: 'main-dashboard', 
-        component: () => import('@/views/defaultPage/DashBoard.vue'), // lazy
+        name: 'main-dashboard',
+        component: () => import('@/views/defaultPage/DashBoard.vue'),
+      },
+      {
+        path: 'qna',
+        name: 'dashboard-qna-list',
+        component: () => import('@/components/qna/QnaList.vue'),
+      },
+      {
+        path: 'qna/new',
+        name: 'dashboard-qna-new',
+        component: () => import('@/components/qna/Qna.vue'),
+      },
+      {
+        path: 'qna/:id',
+        name: 'dashboard-qna-detail',
+        component: () => import('@/components/qna/QnaDetail.vue'),
+      },
+      {
+        path: 'diary',
+        name: 'main-diary',
+        component: () => import('@/views/diary/Diary.vue'),
+      },
+      {
+        path: 'calendar',
+        name: 'main-calendar',
+        component: () => import('@/views/calendar/Calendar.vue'),
       },
       {
         path: 'exerciseRecords',
-        name: 'main-exerciseRecords', 
-        component: () => import('@/views/defaultPage/ExerciseRecords.vue'), 
+        name: 'main-exerciseRecords',
+        component: () => import('@/views/defaultPage/ExerciseRecords.vue'),
       },
       {
         path: 'dietmanagement',
@@ -44,4 +68,4 @@ export default [
       },
     ],
   },
-];
+]
