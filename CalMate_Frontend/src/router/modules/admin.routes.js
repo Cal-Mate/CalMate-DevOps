@@ -14,7 +14,7 @@ export default [
             {
                 path: 'dashboard',
                 name: 'admin-childe-dashboard',
-                component: () => import('@/views/AdminPage/AdminDashBoard.vue'), 
+                component: () => import('@/views/AdminPage/AdminDashboard.vue'), 
             },
             {
                 path: 'users',
