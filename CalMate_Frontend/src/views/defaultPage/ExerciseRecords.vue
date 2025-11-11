@@ -7,10 +7,13 @@
           오늘 {{ totalMinutes }}분 운동 · {{ totalKcal }} kcal 소모
         </p>
       </div>
-      <button class="add-btn" @click="openModal">
-        <img :src="plusIcon" alt="add" class="add-icon" />
-        운동 추가
-      </button>
+      <div class="header-actions">
+        <button class="ghost-btn" v-if="records.length" @click="clearAll">전체 삭제</button>
+        <button class="add-btn" @click="openModal">
+          <img :src="plusIcon" alt="add" class="add-icon" />
+          운동 추가
+        </button>
+      </div>
     </div>
 
     <div class="summary-section">
@@ -52,6 +55,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useToast } from '@/lib/toast'
 import ExerciseSummaryCard from '@/components/exerciseRecords/ExerciseSummaryCard.vue'
 import ExerciseTodayList from '@/components/exerciseRecords/ExerciseTodayList.vue'
 import ExerciseRecordModal from '@/components/exerciseRecords/ExerciseRecordModal.vue'
@@ -91,6 +95,7 @@ watch(records, (arr) => {
 }, { deep: true })
 
 const isModalOpen = ref(false)
+const { success } = useToast()
 
 const openModal = () => {
   isModalOpen.value = true
@@ -111,7 +116,21 @@ const addRecord = payload => {
 }
 
 const deleteRecord = id => {
-  records.value = records.value.filter(r => r.id !== id)
+  if (confirm('이 기록을 삭제할까요?')) {
+    records.value = records.value.filter(r => r.id !== id)
+    success('운동 기록이 삭제되었습니다.')
+  }
+}
+
+const clearAll = () => {
+  if (!records.value.length) return
+  if (confirm('오늘 등록한 모든 운동 기록을 삭제할까요?')) {
+    records.value = []
+    const map = loadMap()
+    map[toTodayKey()] = { records: [], burnKcal: 0 }
+    saveMap(map)
+    success('오늘 운동 기록을 모두 삭제했습니다.')
+  }
 }
 
 const totalMinutes = computed(() =>
@@ -136,6 +155,7 @@ const totalCount = computed(() => records.value.length)
   align-items: center;
   margin-bottom: 24px;
 }
+.header-actions { display: flex; align-items: center; gap: 8px; }
 .title-wrap h2 {
   font-size: 24px;
   font-weight: 600;
@@ -166,4 +186,7 @@ const totalCount = computed(() => records.value.length)
   display: flex;
   gap: 16px;
 }
+
+.ghost-btn { border: 1px solid #e5e7eb; background: #fff; color: #374151; padding: 10px 14px; border-radius: 12px; cursor: pointer; }
+.ghost-btn:hover { border-color: #d1d5db; }
 </style>

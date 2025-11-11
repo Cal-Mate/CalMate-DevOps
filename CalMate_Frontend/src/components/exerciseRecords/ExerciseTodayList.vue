@@ -35,8 +35,14 @@
           </div>
         </div>
 
-        <div class="image-wrap">
-          <img :src="item.imageUrl || exampleImage" alt="운동 사진" />
+        <div class="image-wrap" v-if="(item.imageUrls && item.imageUrls.length) || item.imageUrl">
+          <img :src="item.imageUrl || item.imageUrls?.[0]" alt="운동 사진" />
+        </div>
+        <div class="thumbs" v-if="item.imageUrls && item.imageUrls.length > 1">
+          <img v-for="(src, i) in item.imageUrls" :key="i" :src="src" alt="미리보기" />
+        </div>
+        <div class="image-wrap" v-else>
+          <img :src="exampleImage" alt="운동 예시" />
         </div>
       </div>
     </div>
@@ -90,7 +96,7 @@ defineEmits(['delete'])
   border-radius: 16px;
   border: 1px solid #eceef2;
   padding: 18px 20px;
-  background-color: #ffffff;
+  background: linear-gradient(0deg, #ffffff, #ffffff), radial-gradient(1200px 200px at 0% 0%, #f0f7ff 0%, transparent 60%);
 }
 
 .header-row {
@@ -168,4 +174,7 @@ defineEmits(['delete'])
   border-radius: 14px;
   display: block;
 }
+
+.thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; margin-top: 8px; }
+.thumbs img { width: 100%; height: 70px; object-fit: cover; border-radius: 8px; border: 1px solid #e6e8ee; }
 </style>
