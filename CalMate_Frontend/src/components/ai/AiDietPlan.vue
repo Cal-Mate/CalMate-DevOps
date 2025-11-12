@@ -1,7 +1,7 @@
 <template>
   <div class="ai-diet-plan-container">
     <div class="ai-button" @click="handleAiRecommend">
-      <div class="button-text">AI 추천 식단 플랜</div>
+      <div class="button-text">AI 추천 플랜</div>
     </div>
 
     <div class="plan-wrapper" v-if="aiResponse">
@@ -63,7 +63,7 @@ import { useLoadingStore } from '@/stores/loading'
 const userStore = useUserStore();
 const aiResponse = ref(null);
 const dietPlan = ref(null);
-const loading = useLoadingStore()
+const loading = useLoadingStore();
 
 const mealTypeKorean = {
   breakfast: '아침',

@@ -62,6 +62,7 @@ export const useUserStore = defineStore(
       gender.value = '';
       phone.value = '';
       sessionStorage.removeItem('aiDietPlan');
+      sessionStorage.removeItem('aiExercisePlan');
     }
 
     function setToken(jwtToken) {

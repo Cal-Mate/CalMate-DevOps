@@ -25,7 +25,7 @@
         <div class="content-header">
           <div class="icon-wrapper-20">
           </div>
-          <div class="content-title">AI 추천 식단 플랜</div>
+          <div class="content-title">AI 추천 플랜</div>
         </div>
         <div v-if="route.path === '/main/ai' || route.path === '/main/ai/'" class="container">
           <img class="main-image" src="@/assets/images/ai/aidietbot.png" alt="placeholder image" />
@@ -240,7 +240,7 @@ const memberBodyMetrics = userStore.bodyMetrics;
 .description {
   color: #717182;
   font-size: 16px;
-  
+
   line-height: 24px;
   text-align: center;
 }
