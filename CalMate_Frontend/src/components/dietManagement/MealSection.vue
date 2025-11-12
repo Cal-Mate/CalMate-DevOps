@@ -56,6 +56,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import AddFoodModal from './AddFoodModal.vue'
 import deleteIcon from '@/assets/images/delete.png'
 import editIcon from '@/assets/images/edit.png'
@@ -68,7 +69,6 @@ const props = defineProps({
   label: String,
 })
 
-// ✅ 상위(DietManagement + Breakfast/Lunch/...)로 이벤트 올림
 const emit = defineEmits(['update-total', 'meal-point-earned'])
 
 const mealKeyMap = {
@@ -95,10 +95,8 @@ const foods = ref([])
 const userStore = useUserStore()
 const memberId = computed(() => userStore.userId)
 
-// 백엔드 baseURL (예: http://localhost:8081)
 const apiBaseURL = (api.defaults.baseURL || '').replace(/\/$/, '')
 
-// fileUrl → 최종 img src 로 변환
 const resolveFileUrl = (fileUrl) => {
   if (!fileUrl) return ''
   if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
@@ -114,11 +112,18 @@ const resolveFileUrl = (fileUrl) => {
   return apiBaseURL + path
 }
 
+const route = useRoute()
+
 const currentDate = computed(() => {
-  return new Date().toISOString().slice(0, 10)
+  const q = route.query.date
+  if (typeof q === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(q)) return q
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 })
 
-// ✅ 합계 재계산 + 상위로 emit
 const recalcTotal = () => {
   const total = foods.value.reduce((sum, f) => sum + Number(f.kcal || 0), 0)
   if (mealKey) {
@@ -203,7 +208,6 @@ const handleSaveFood = async (food) => {
       sodium: 0,
     }
 
-    // 수정
     if (editingFood.value && editingFood.value.id) {
       const filesToSend = food.imagesTouched ? food.files || [] : null
       const keepFileIdsToSend = food.imagesTouched ? food.keepFileIds || [] : null
@@ -218,7 +222,6 @@ const handleSaveFood = async (food) => {
         keepFileIds: keepFileIdsToSend,
       })
     } else {
-      // 신규 등록
       await createDiet({
         date: currentDate.value,
         type: dietType,
@@ -226,10 +229,6 @@ const handleSaveFood = async (food) => {
         food: bodyFood,
         files: food.files || [],
       })
-
-      // 🔥 여기서 포인트 모달 트리거 (일단 항상)
-      // 나중에 백엔드에서 "오늘 첫 식단 기록인지" 체크하고
-      // 응답에 pointEarned 같은 플래그 넣어주면, 그때 조건 걸면 됨.
       emit('meal-point-earned')
     }
 
