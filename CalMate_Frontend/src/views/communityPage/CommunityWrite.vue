@@ -92,7 +92,7 @@ const goBack = () => router.back()
 import { nextTick } from 'vue'
 
 const submitPost = async () => {
-  await nextTick()  // ✅ form 값이 다 반영된 뒤 전송 (빈 FormData 방지)
+  // await nextTick()  // ✅ form 값이 다 반영된 뒤 전송 (빈 FormData 방지)
 
   // ✅ 로그인 체크
   if (!userStore.isLoggedIn) {

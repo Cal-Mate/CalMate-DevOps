@@ -29,6 +29,12 @@
             <button class="delete-btn" @click="deletePost">삭제</button>
           </template>
 
+          <!-- 타인 게시물일 경우 신고 버튼 -->
+          <template v-else-if="!isEditing && post.memberId !== userStore.userId">
+            <button class="report-btn" @click="openReportModal">🚨 신고</button>
+          </template>
+          
+          <!-- 수정 모드 -->
           <template v-else-if="isEditing">
             <button class="save-btn" @click="saveEdit" :disabled="saving">
               {{ saving ? '저장 중...' : '저장' }}
@@ -118,6 +124,49 @@
         />
       </div>
     </div>
+
+    <!-- ✅ 신고 모달 -->
+    <div v-if="showReportModal" class="modal-overlay">
+      <div class="modal-box">
+        <h3>🚨 게시글 신고하기</h3>
+        <p class="modal-subtext">신고 정보를 입력해주세요.</p>
+
+        <div class="modal-form">
+          <label>신고 제목</label>
+          <input
+            type="text"
+            v-model="reportForm.title"
+            placeholder="신고 제목을 입력하세요"
+          />
+
+          <label>신고 사유</label>
+          <select v-model="reportForm.reason">
+            <option value="" disabled>신고 사유를 선택하세요</option>
+            <option v-for="reason in reportReasons" :key="reason" :value="reason">
+              {{ reason }}
+            </option>
+          </select>
+
+          <label>신고 내용</label>
+          <textarea
+            v-model="reportForm.content"
+            placeholder="신고 내용을 입력하세요..."
+          ></textarea>
+
+          <label>이미지 첨부 (선택, 여러 장 가능)</label>
+          <input type="file" multiple @change="handleFiles" />
+
+          <div v-if="previewImages.length" class="preview-list">
+            <img v-for="(img, i) in previewImages" :key="i" :src="img" class="preview-img" />
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button class="modal-btn" @click="submitReport">제출</button>
+          <button class="cancel-btn" @click="closeReportModal">취소</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -150,11 +199,78 @@ const liked = ref(false)
 const isEditing = ref(false)
 const saving = ref(false)
 
+/* ✅ 신고 관련 상태 */
+const showReportModal = ref(false)
+const reportReasons = [
+  "욕설", "도배", "사기", "음란물", "허위사실", "스팸", "괴롭힘", "기타", "명예훼손", "불법 광고"
+]
+const reportForm = ref({
+  title: '',
+  reason: '',
+  content: '',
+  victimMemberId: null,
+  offenderMemberId: null,
+  postId: null
+})
+const attachedFiles = ref([])
+const previewImages = ref([])
+
+
 const removeExistingImage = (index) => {
   removedImages.value.push(existingImages.value[index])
   existingImages.value.splice(index, 1)
 }
 
+
+const openReportModal = () => {
+  if (!userStore.isLoggedIn) {
+    alert("로그인이 필요합니다 😊")
+    return router.push("/sign/signIn")
+  }
+  showReportModal.value = true
+  reportForm.value.victimMemberId = userStore.userId
+  reportForm.value.offenderMemberId = post.value.memberId
+  reportForm.value.postId = post.value.id
+}
+
+const closeReportModal = () => {
+  showReportModal.value = false
+  reportForm.value = {
+    title: '',
+    reason: '',
+    content: '',
+    victimMemberId: userStore.userId,
+    offenderMemberId: post.value.memberId,
+    postId: post.value.id
+  }
+  attachedFiles.value = []
+  previewImages.value = []
+}
+
+const submitReport = async () => {
+  try {
+    const fd = new FormData()
+    fd.append("title", reportForm.value.title)
+    fd.append("reason", reportForm.value.reason)
+    fd.append("content", reportForm.value.content)
+    fd.append("victimMemberId", reportForm.value.victimMemberId)
+    fd.append("offenderMemberId", reportForm.value.offenderMemberId)
+    fd.append("postId", reportForm.value.postId)
+    fd.append("commentId", null) // ✅ 명시적으로 추가
+    attachedFiles.value.forEach(img => fd.append("images", img))
+
+    await api.post("/api/report", fd, {
+      headers: { "Content-Type": "multipart/form-data" }
+    })
+    alert("신고가 접수되었습니다.")
+    closeReportModal()
+  } catch (err) {
+    console.error(err)
+    alert("신고 중 오류가 발생했습니다.")
+  }
+}
+
+/* ✅ 게시글 + 댓글 */
 const loadPost = async () => {
   const { data } = await api.get(`/community/post/${route.params.postId}`, {
     params: { memberId: userStore.userId || 0 }
@@ -260,6 +376,56 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.report-btn {
+  background: #d9534f;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+/* ✅ 신고 모달 */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.55);
+  display: flex; justify-content: center; align-items: center;
+  z-index: 999;
+}
+
+.modal-box {
+  background: white; width: 420px; padding: 28px 26px;
+  border-radius: 14px; text-align: center;
+}
+
+.modal-subtext { color: #777; font-size: 14px; margin-bottom: 10px; }
+
+.modal-form { display: flex; flex-direction: column; gap: 10px; text-align: left; }
+
+.modal-form input, .modal-form select, .modal-form textarea {
+  width: 100%; border: 1px solid #ddd; border-radius: 8px; padding: 10px; font-size: 14px;
+}
+
+.modal-form textarea { min-height: 100px; resize: vertical; }
+
+.preview-list {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px;
+}
+
+.preview-img {
+  width: 90px; height: 90px; border-radius: 10px; object-fit: cover; border: 1px solid #ccc;
+}
+.modal-actions { display: flex; justify-content: center; gap: 10px; margin-top: 18px; }
+.modal-btn {
+  background: #6c63ff; color: #fff; border: none; padding: 10px 18px;
+  border-radius: 8px; cursor: pointer;
+}
+.cancel-btn {
+  border: 1px solid #aaa; background: #fff; color: #555;
+  border-radius: 8px; padding: 10px 18px; cursor: pointer;
+}
+
 .detail-wrap {
   max-width: 750px;
   margin: auto;
