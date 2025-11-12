@@ -2,33 +2,35 @@
   <div class="diet-page">
     <header class="header">
       <h2 class="title">식단 관리</h2>
-      <p class="subtitle">오늘 총 {{ totalKcal }} kcal 섭취</p>
+      <p class="subtitle">
+        {{ selectedDateLabel }} 총 {{ totalKcal }} kcal 섭취
+      </p>
     </header>
 
     <nav class="tab-bar">
       <router-link
-        to="/main/dietmanagement/breakfast"
+        :to="{ path: '/main/dietmanagement/breakfast', query: route.query }"
         class="tab"
         :class="{ active: route.path === '/main/dietmanagement/breakfast' }"
       >
         아침
       </router-link>
       <router-link
-        to="/main/dietmanagement/lunch"
+        :to="{ path: '/main/dietmanagement/lunch', query: route.query }"
         class="tab"
         :class="{ active: route.path === '/main/dietmanagement/lunch' }"
       >
         점심
       </router-link>
       <router-link
-        to="/main/dietmanagement/dinner"
+        :to="{ path: '/main/dietmanagement/dinner', query: route.query }"
         class="tab"
         :class="{ active: route.path === '/main/dietmanagement/dinner' }"
       >
         저녁
       </router-link>
       <router-link
-        to="/main/dietmanagement/snack"
+        :to="{ path: '/main/dietmanagement/snack', query: route.query }"
         class="tab"
         :class="{ active: route.path === '/main/dietmanagement/snack' }"
       >
@@ -36,8 +38,6 @@
       </router-link>
     </nav>
 
-    <!-- 🔥 router-view 에 바로 @ 이벤트 달면 안 먹음 -->
-    <!-- 🔥 v-slot 으로 꺼내서 component 에 이벤트 연결해야 함 -->
     <router-view v-slot="{ Component }">
       <component
         :is="Component"
@@ -46,7 +46,6 @@
       />
     </router-view>
 
-    <!-- ✅ 포인트 모달 -->
     <div v-if="showPointModal" class="modal-overlay">
       <div class="modal-box">
         <h3>🎉 5포인트가 적립되었습니다!</h3>
@@ -64,13 +63,31 @@ import { dietStore } from '@/stores/dietStore'
 
 const route = useRoute()
 
-// 🔥 상단에 보여줄 총 kcal
 const totalKcal = computed(() => dietStore.total)
 
-// ✅ 포인트 모달 상태
+const selectedDateStr = computed(() => {
+  const q = route.query.date
+  if (typeof q === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(q)) return q
+
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+})
+
+const selectedDateLabel = computed(() => {
+  const d = new Date(selectedDateStr.value)
+  if (Number.isNaN(d.getTime())) return selectedDateStr.value
+  return d.toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+})
+
 const showPointModal = ref(false)
 
-// ✅ 모달 열기/닫기
 const onMealPointEarned = () => {
   showPointModal.value = true
 }
@@ -78,23 +95,10 @@ const closePointModal = () => {
   showPointModal.value = false
 }
 
-// ✅ 각 섹션에서 합계 올라오는 경우 처리
-const onUpdateTotal = (sectionTotal) => {
-  // 섹션별 total 을 합쳐서 dietStore.total 을 관리하고 싶다면
-  // 여기서 로직 추가해서 dietStore.total 갱신해도 됨.
-  // 간단히 예시로는 일단 그대로 dietStore.total 을 쓰도록 둠.
-  // console.log('섹션 합계 변경:', sectionTotal)
-}
+const onUpdateTotal = () => {}
 
-// ====== localStorage 저장 (캘린더 연동용 기존 로직 유지) ======
 const STORE_KEY = 'dietTotalsByDate'
-const todayKey = () => {
-  const d = new Date()
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
+
 const loadMap = () => {
   try {
     return JSON.parse(localStorage.getItem(STORE_KEY) || '{}')
@@ -106,7 +110,7 @@ const saveMap = (map) => localStorage.setItem(STORE_KEY, JSON.stringify(map))
 
 watchEffect(() => {
   const map = loadMap()
-  map[todayKey()] = { totalKcal: Number(totalKcal.value) || 0 }
+  map[selectedDateStr.value] = { totalKcal: Number(totalKcal.value) || 0 }
   saveMap(map)
 })
 </script>
@@ -159,7 +163,6 @@ watchEffect(() => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
-/* ✅ 포인트 모달 스타일 (커뮤니티 작성 모달이랑 비슷하게) */
 .modal-overlay {
   position: fixed;
   top: 0;
