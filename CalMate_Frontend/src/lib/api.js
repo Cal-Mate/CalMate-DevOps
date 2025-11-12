@@ -114,6 +114,7 @@ api.interceptors.response.use(
       original._retry = true;
 
       try {
+        // console.log('리프래시 시도?')
         // ─────────────────────────────────────────────────────────
         // (A) 현재 진행 중인 리프레시가 없다면 "지금" 하나 만든다.
         //     있으면 새로 만들지 않고 그 Promise를 그대로 기다린다.
@@ -148,7 +149,7 @@ api.interceptors.response.use(
             // 4-2-4-2-4) Pinia 스토어에 새 토큰 반영 (요청 인터셉터가 이후부터 자동 부착)
             const user = useUserStore();                             // ✔ 스토어 접근
             user.setToken(newAccessToken);                           // ✔ 토큰 갱신(Pinia 상태 업데이트)
-            success('토큰 재 발급',{description: '엑세스 토큰이 재 발급 되었습니다.' });
+            info('토큰 재 발급',{description: '엑세스 토큰이 재 발급 되었습니다.' });
             // 4-2-4-2-5) 이 Promise의 결과값으로 새 토큰을 반환 (동시에 기다리는 요청들이 이 값을 받는다)
             return newAccessToken;
           })()

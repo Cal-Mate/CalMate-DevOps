@@ -195,8 +195,19 @@ const userStore = useUserStore();
 /* 비밀번호 변경 모달 */
 const pwdModalOpen = ref(false)
 async function changePassword({ current, next }){
-  // TODO: await api.post('/change-password', { current, next })
-  alert(`비밀번호 변경\n현재: ${current}\n새: ${next}`)
+  try{
+      const response =  await api.post('/member/member-password', { 
+          id : userStore.userId,
+          newPassword: next, 
+          oldPassword: current
+        })
+
+    if(response.data.httpStatus === 200 )
+      success('비밀번호 변경', {description: '비밀번호 변경 완료'});
+  } catch(e) {
+    console.log(e);
+    error('비밀번호 변경', {description: '비밀번호 변경 실패'})
+  }
 }
 
 /* ---------------- 폼 상태 ---------------- */
