@@ -171,209 +171,276 @@
 </template>
 
 <script setup>
-import { togglePostLike } from "@/api/post"
-import { ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import api from '@/lib/api'
-import CommentItem from '@/components/CommentItem.vue'
-import { useUserStore } from "@/stores/user"
+import { ref, onMounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import api from "@/lib/api";
+import CommentItem from "@/components/CommentItem.vue";
+import { useUserStore } from "@/stores/user";
+import { togglePostLike } from "@/api/post";
 
-const userStore = useUserStore()
-const route = useRoute()
-const router = useRouter()
+/* ---------- 상수/유틸 ---------- */
+const REASON_TO_BASE_ID = {
+  "욕설": 1, "도배": 2, "사기": 3, "음란물": 4, "허위사실": 5,
+  "스팸": 6, "괴롭힘": 7, "명예훼손": 8, "불법 광고": 9, "기타": 10,
+};
+const numOrNull = v => (v === undefined || v === null || v === "" ? null : Number(v));
 
-const removedImages = ref([])
-const post = ref({})
-const existingImages = ref([])
-const previews = ref([])
-const newImages = ref([])
+/* ---------- 공통 ---------- */
+const userStore = useUserStore();
+const route = useRoute();
+const router = useRouter();
 
-const form = ref({ title: '', content: '', tagId: null })
+/* ---------- 게시글/수정 상태 ---------- */
+const post = ref({});
+const form = ref({ title: "", content: "", tagId: null });
 
-const comments = ref([])
-const newComment = ref('')
+const isEditing = ref(false);
+const saving = ref(false);
 
-const likeCount = ref(0)
-const liked = ref(false)
+const existingImages = ref([]);
+const removedImages = ref([]);
+const newImages = ref([]);
+const previews = ref([]);
 
-const isEditing = ref(false)
-const saving = ref(false)
+/* ---------- 좋아요/댓글 ---------- */
+const likeCount = ref(0);
+const liked = ref(false);
 
-/* ✅ 신고 관련 상태 */
-const showReportModal = ref(false)
+const comments = ref([]);
+const newComment = ref("");
+
+/* ---------- 신고 ---------- */
+const showReportModal = ref(false);
 const reportReasons = [
-  "욕설", "도배", "사기", "음란물", "허위사실", "스팸", "괴롭힘", "기타", "명예훼손", "불법 광고"
-]
+  "욕설","도배","사기","음란물","허위사실","스팸","괴롭힘","기타","명예훼손","불법 광고",
+];
 const reportForm = ref({
-  title: '',
-  reason: '',
-  content: '',
-  victimMemberId: null,
-  offenderMemberId: null,
-  postId: null
-})
-const attachedFiles = ref([])
-const previewImages = ref([])
+  title: "",
+  reason: "",
+  content: "",
+  postId: null,
+  commentId: null,
+});
+const reportFiles = ref([]);
+const previewImages = ref([]);
 
+/* ✅ 피신고자(작성자) ID */
+const offenderId = ref(null);
 
-const removeExistingImage = (index) => {
-  removedImages.value.push(existingImages.value[index])
-  existingImages.value.splice(index, 1)
+/* ---------- 파일 핸들러 ---------- */
+const handleFiles = (e) => {
+  newImages.value = Array.from(e.target.files || []);
+  previews.value = newImages.value.map(f => URL.createObjectURL(f));
+};
+const onReportFiles = (e) => {
+  const files = Array.from(e.target.files || []);
+  reportFiles.value = files;
+  previewImages.value = files.map(f => URL.createObjectURL(f));
+};
+const removeExistingImage = (idx) => {
+  removedImages.value.push(existingImages.value[idx]);
+  existingImages.value.splice(idx, 1);
+};
+
+/* ---------- 보조: 작성자 ID 해소기 ---------- */
+// 1) 상세 응답의 다양한 키에서 시도
+function pickAuthorId(obj) {
+  return Number(
+    obj?.memberId ??
+    obj?.authorId ??
+    obj?.author?.id ??
+    obj?.writerId ??
+    obj?.userId
+  ) || null;
 }
-
-
-const openReportModal = () => {
-  if (!userStore.isLoggedIn) {
-    alert("로그인이 필요합니다 😊")
-    return router.push("/sign/signIn")
+// 2) 없으면 서버로부터 별도 조회 (엔드포인트는 필요 시 바꿔 끼우세요)
+async function fetchAuthorIdFallback(postId) {
+  try {
+    // 예: { memberId: 123 }
+    const { data } = await api.get(`/community/post/${postId}/author-id`);
+    return Number(data?.memberId) || null;
+  } catch {
+    return null;
   }
-  showReportModal.value = true
-  reportForm.value.victimMemberId = userStore.userId
-  reportForm.value.offenderMemberId = post.value.memberId
-  reportForm.value.postId = post.value.id
 }
+
+/* ---------- 신고 열기/닫기 ---------- */
+const openReportModal = async () => {
+  if (!userStore.isLoggedIn) {
+    alert("로그인이 필요합니다 😊");
+    return router.push("/sign/signIn");
+  }
+
+  // 작성자 ID가 없으면 보조 조회 한 번 더 시도
+  if (!offenderId.value) {
+    offenderId.value = await fetchAuthorIdFallback(route.params.postId);
+  }
+  if (!offenderId.value) {
+    return alert("작성자 ID를 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.");
+  }
+
+  showReportModal.value = true;
+  reportForm.value.postId = post.value.id;
+  reportForm.value.commentId = null;
+};
 
 const closeReportModal = () => {
-  showReportModal.value = false
+  showReportModal.value = false;
   reportForm.value = {
-    title: '',
-    reason: '',
-    content: '',
-    victimMemberId: userStore.userId,
-    offenderMemberId: post.value.memberId,
-    postId: post.value.id
-  }
-  attachedFiles.value = []
-  previewImages.value = []
-}
+    title: "",
+    reason: "",
+    content: "",
+    postId: post.value.id,
+    commentId: null,
+  };
+  reportFiles.value = [];
+  previewImages.value = [];
+};
 
+/* ---------- 신고 제출 (/reports: request + files[]) ---------- */
 const submitReport = async () => {
   try {
-    const fd = new FormData()
-    fd.append("title", reportForm.value.title)
-    fd.append("reason", reportForm.value.reason)
-    fd.append("content", reportForm.value.content)
-    fd.append("victimMemberId", reportForm.value.victimMemberId)
-    fd.append("offenderMemberId", reportForm.value.offenderMemberId)
-    fd.append("postId", reportForm.value.postId)
-    fd.append("commentId", null) // ✅ 명시적으로 추가
-    attachedFiles.value.forEach(img => fd.append("images", img))
+    if (!userStore.isLoggedIn) {
+      alert("로그인이 필요합니다 😊");
+      return router.push("/sign/signIn");
+    }
+    if (!reportForm.value.reason) {
+      return alert("신고 사유를 선택해주세요.");
+    }
 
-    await api.post("/api/report", fd, {
-      headers: { "Content-Type": "multipart/form-data" }
-    })
-    alert("신고가 접수되었습니다.")
-    closeReportModal()
+    // 마지막 방어
+    if (!offenderId.value) {
+      offenderId.value = await fetchAuthorIdFallback(route.params.postId);
+    }
+    if (!offenderId.value) {
+      return alert("작성자 ID를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");
+    }
+
+    const payload = {
+      title: String(reportForm.value.title ?? ""),
+      contents: String(reportForm.value.content ?? ""),
+      reportedMemberId: numOrNull(offenderId.value),         // member_id2
+      reporterMemberId: numOrNull(userStore.userId),         // member_id
+      postId: numOrNull(reportForm.value.postId),
+      commentId:
+        reportForm.value.commentId === null
+          ? null
+          : numOrNull(reportForm.value.commentId),
+      reportBaseId:
+        REASON_TO_BASE_ID[reportForm.value.reason] ?? REASON_TO_BASE_ID["기타"],
+    };
+
+    const fd = new FormData();
+    fd.append("request", new Blob([JSON.stringify(payload)], { type: "application/json" }));
+    (reportFiles.value || []).forEach(f => f && fd.append("files", f));
+
+    await api.post("/reports", fd);
+    alert("신고가 접수되었습니다.");
+    closeReportModal();
   } catch (err) {
-    console.error(err)
-    alert("신고 중 오류가 발생했습니다.")
+    console.error("[REPORT ERROR]", err);
+    const detail = err?.response?.data || err?.message || err;
+    alert(`신고 중 오류가 발생했습니다.\n${
+      typeof detail === "string" ? detail : JSON.stringify(detail)
+    }`);
   }
-}
+};
 
-/* ✅ 게시글 + 댓글 */
+/* ---------- 데이터 로드 ---------- */
 const loadPost = async () => {
   const { data } = await api.get(`/community/post/${route.params.postId}`, {
-    params: { memberId: userStore.userId || 0 }
-  })
+    params: { memberId: userStore.userId || 0 },
+  });
 
-  post.value = data
+  post.value = data;
+  offenderId.value = pickAuthorId(data); // 1차 시도
+
   form.value = {
     title: data.title,
     content: data.content,
-    tagId: data.tagId != null ? String(data.tagId) : ''
-  }
-  existingImages.value = data.images ?? []
-
-  likeCount.value = data.likes ?? 0
-  liked.value = data.liked ?? false
-}
+    tagId: data.tagId != null ? String(data.tagId) : "",
+  };
+  existingImages.value = data.images ?? [];
+  likeCount.value = data.likes ?? 0;
+  liked.value = data.liked ?? false;
+};
 
 const loadComments = async () => {
-  const { data } = await api.get(`/community/post/${route.params.postId}/comments`, {
-    params: { memberId: userStore.userId || 0 }
-  })
-  comments.value = data
-}
+  const { data } = await api.get(
+    `/community/post/${route.params.postId}/comments`,
+    { params: { memberId: userStore.userId || 0 } }
+  );
+  comments.value = data;
+};
 
-const handleFiles = (e) => {
-  newImages.value = Array.from(e.target.files)
-  previews.value = newImages.value.map(f => URL.createObjectURL(f))
-}
-
-const saveEdit = async () => {
-  saving.value = true
-
-  const fd = new FormData()
-  fd.append('title', form.value.title)
-  fd.append('content', form.value.content)
-  fd.append('tagId', form.value.tagId)
-
-  removedImages.value.forEach(url => fd.append("deleteImages", url))
-  newImages.value.forEach(img => fd.append("images", img))
-
-  await api.patch(`/community/post/${route.params.postId}`, fd, {
-    headers: { "Content-Type": "multipart/form-data" }
-  })
-
-  await loadPost()
-  previews.value = []
-  newImages.value = []
-  removedImages.value = []
-  isEditing.value = false
-  saving.value = false
-}
-
+/* ---------- 수정/삭제 ---------- */
 const startEdit = () => {
-  if (post.value.memberId !== userStore.userId) return
-  isEditing.value = true
-}
-
+  if (post.value.memberId !== userStore.userId) return;
+  isEditing.value = true;
+};
 const cancelEdit = () => {
-  previews.value = []
-  newImages.value = []
-  isEditing.value = false
-}
+  previews.value = [];
+  newImages.value = [];
+  isEditing.value = false;
+};
+const saveEdit = async () => {
+  try {
+    saving.value = true;
 
-const deletePost = async () => {
-  if (post.value.memberId !== userStore.userId) return
-  if (!confirm("정말 삭제하시겠습니까?")) return
-  await api.delete(`/community/post/${route.params.postId}`)
-  router.push("/community")
-}
+    const fd = new FormData();
+    fd.append("title", form.value.title);
+    fd.append("content", form.value.content);
+    fd.append("tagId", form.value.tagId);
 
-const toggleLikePost = async () => {
-  // ✅ 여기 로그인 체크 추가됨
-  if (!userStore.isLoggedIn) {
-    alert("로그인이 필요합니다 😊")
-    return router.push("/sign/signIn")
+    removedImages.value.forEach(u => fd.append("deleteImages", u));
+    newImages.value.forEach(f => fd.append("images", f));
+
+    await api.patch(`/community/post/${route.params.postId}`, fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+
+    await loadPost();
+    previews.value = [];
+    newImages.value = [];
+    removedImages.value = [];
+    isEditing.value = false;
+  } finally {
+    saving.value = false;
   }
+};
 
-  await togglePostLike(route.params.postId, userStore.userId)
-  liked.value = !liked.value
-  likeCount.value += liked.value ? 1 : -1
-}
-
+/* ---------- 좋아요/댓글 액션 ---------- */
+const toggleLikePost = async () => {
+  if (!userStore.isLoggedIn) {
+    alert("로그인이 필요합니다 😊");
+    return router.push("/sign/signIn");
+  }
+  await togglePostLike(route.params.postId, userStore.userId);
+  liked.value = !liked.value;
+  likeCount.value += liked.value ? 1 : -1;
+};
 const submitComment = async () => {
   if (!userStore.isLoggedIn) {
-    alert("로그인이 필요합니다 😊")
-    return router.push("/sign/signIn")
+    alert("로그인이 필요합니다 😊");
+    return router.push("/sign/signIn");
   }
-
-  if (!newComment.value.trim()) return
+  if (!newComment.value.trim()) return;
 
   await api.post(`/community/post/${route.params.postId}/comments`, {
     memberId: userStore.userId,
-    content: newComment.value
-  })
-  newComment.value = ''
-  loadComments()
-}
+    content: newComment.value,
+  });
+  newComment.value = "";
+  loadComments();
+};
 
+/* ---------- 초기 로드 ---------- */
 onMounted(() => {
-  loadPost()
-  loadComments()
-})
+  loadPost();
+  loadComments();
+});
 </script>
+
 
 <style scoped>
 .report-btn {

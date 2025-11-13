@@ -40,7 +40,7 @@
         </li>
 
         <li class="menu-item">
-          <RouterLink class="menu-link" to="#">
+          <RouterLink class="menu-link" to="/main/ai">
             <img :src="aiIcon" alt="" class="menu-icon" />
             <span>AI 추천</span>
           </RouterLink>

@@ -116,7 +116,7 @@
 <script setup>
 defineOptions({ name: 'CommentItem' })
 
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from "@/stores/user"
 import { addComment, updateComment, deleteComment, toggleCommentLike } from '@/api/post'
@@ -131,7 +131,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['submitted'])
 
-/* ✅ 좋아요 */
+/* ===== 좋아요 ===== */
 const likeCount = ref(props.comment.likeCount ?? 0)
 const liked = ref(props.comment.liked ?? false)
 
@@ -140,19 +140,12 @@ const toggleLike = async () => {
     alert("로그인이 필요합니다 😊")
     return router.push("/sign/signIn")
   }
-
   await toggleCommentLike(props.comment.id, userStore.userId)
-
-  if (liked.value) {
-    likeCount.value = Math.max(likeCount.value - 1, 0)
-    liked.value = false
-  } else {
-    likeCount.value += 1
-    liked.value = true
-  }
+  liked.value ? (likeCount.value = Math.max(likeCount.value - 1, 0)) : (likeCount.value += 1)
+  liked.value = !liked.value
 }
 
-/* ✅ 대댓글 */
+/* ===== 대댓글 ===== */
 const showReply = ref(false)
 const replyText = ref('')
 const toggleReply = () => (showReply.value = !showReply.value)
@@ -163,19 +156,17 @@ const submitReply = async () => {
     return router.push("/sign/signIn")
   }
   if (!replyText.value.trim()) return
-
   await addComment(props.postId, {
     memberId: userStore.userId,
     content: replyText.value,
     parentId: props.comment.id
   })
-
   replyText.value = ''
   showReply.value = false
   emit('submitted')
 }
 
-/* ✅ 수정/삭제 */
+/* ===== 수정/삭제 ===== */
 const isEditing = ref(false)
 const editText = ref(props.comment.content)
 
@@ -186,36 +177,37 @@ const startEdit = () => {
   }
   isEditing.value = true
 }
-
 const cancelEdit = () => {
   editText.value = props.comment.content
   isEditing.value = false
 }
-
 const saveEdit = async () => {
   if (!editText.value.trim()) return
   await updateComment(props.postId, props.comment.id, editText.value, userStore.userId)
   isEditing.value = false
   emit('submitted')
 }
-
 const removeComment = async () => {
   if (!confirm("정말 삭제하시겠습니까?")) return
   await deleteComment(props.postId, props.comment.id, userStore.userId)
   emit('submitted')
 }
 
-/* ✅ 신고 기능 */
+/* ===== 신고 ===== */
+const REASON_TO_BASE_ID = {
+  '욕설': 1, '도배': 2, '사기': 3, '음란물': 4, '허위사실': 5,
+  '스팸': 6, '괴롭힘': 7, '명예훼손': 8, '불법 광고': 9, '기타': 10,
+}
+const toNumOrNull = v => (v === undefined || v === null || v === '' ? null : Number(v))
+
 const showReportModal = ref(false)
 const reportReasons = [
-  "욕설", "도배", "사기", "음란물", "허위사실", "스팸", "괴롭힘", "기타", "명예훼손", "불법 광고"
+  "욕설","도배","사기","음란물","허위사실","스팸","괴롭힘","기타","명예훼손","불법 광고"
 ]
 const reportForm = ref({
   title: '',
   reason: '',
   content: '',
-  victimMemberId: null,
-  offenderMemberId: null,
   postId: props.postId,
   commentId: props.comment.id
 })
@@ -223,8 +215,8 @@ const attachedFiles = ref([])
 const previewImages = ref([])
 
 const handleFiles = (e) => {
-  attachedFiles.value = Array.from(e.target.files)
-  previewImages.value = attachedFiles.value.map(file => URL.createObjectURL(file))
+  attachedFiles.value = Array.from(e.target.files || [])
+  previewImages.value = attachedFiles.value.map(f => URL.createObjectURL(f))
 }
 
 const openReportModal = () => {
@@ -232,9 +224,11 @@ const openReportModal = () => {
     alert("로그인이 필요합니다 😊")
     return router.push("/sign/signIn")
   }
+  // 피신고자 = 댓글 작성자
+  if (!toNumOrNull(props.comment.memberId)) {
+    return alert("작성자 ID를 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.")
+  }
   showReportModal.value = true
-  reportForm.value.victimMemberId = userStore.userId
-  reportForm.value.offenderMemberId = props.comment.memberId
 }
 
 const closeReportModal = () => {
@@ -243,8 +237,6 @@ const closeReportModal = () => {
     title: '',
     reason: '',
     content: '',
-    victimMemberId: userStore.userId,
-    offenderMemberId: props.comment.memberId,
     postId: props.postId,
     commentId: props.comment.id
   }
@@ -254,24 +246,37 @@ const closeReportModal = () => {
 
 const submitReport = async () => {
   try {
-    const fd = new FormData()
-    fd.append("title", reportForm.value.title)
-    fd.append("reason", reportForm.value.reason)
-    fd.append("content", reportForm.value.content)
-    fd.append("victimMemberId", reportForm.value.victimMemberId)
-    fd.append("offenderMemberId", reportForm.value.offenderMemberId)
-    fd.append("postId", reportForm.value.postId)
-    fd.append("commentId", reportForm.value.commentId)
-    attachedFiles.value.forEach(img => fd.append("images", img))
+    if (!userStore.isLoggedIn) {
+      alert("로그인이 필요합니다 😊")
+      return router.push("/sign/signIn")
+    }
+    if (!reportForm.value.reason) {
+      return alert("신고 사유를 선택해주세요.")
+    }
 
-    await api.post('/api/report', fd, {
-      headers: { "Content-Type": "multipart/form-data" }
-    })
+    const payload = {
+      title: String(reportForm.value.title ?? ''),
+      contents: String(reportForm.value.content ?? ''),
+      reportedMemberId: toNumOrNull(props.comment.memberId), // ← 피신고자(댓글 작성자)
+      reporterMemberId: toNumOrNull(userStore.userId),       // ← 신고자
+      postId: toNumOrNull(reportForm.value.postId),
+      commentId: toNumOrNull(reportForm.value.commentId),
+      reportBaseId: REASON_TO_BASE_ID[reportForm.value.reason] ?? REASON_TO_BASE_ID['기타'],
+    }
+
+    const fd = new FormData()
+    fd.append('request', new Blob([JSON.stringify(payload)], { type: 'application/json' }))
+    ;(attachedFiles.value || []).forEach(f => f && fd.append('files', f))
+
+    await api.post('/reports', fd) // 서버 스펙: request(JSON) + files[]
     alert('신고가 접수되었습니다.')
     closeReportModal()
   } catch (e) {
-    console.error(e)
-    alert('신고 중 오류가 발생했습니다.')
+    console.error('[COMMENT REPORT ERROR]', e)
+    const detail = e?.response?.data || e?.message || e
+    alert(`신고 중 오류가 발생했습니다.\n${
+      typeof detail === 'string' ? detail : JSON.stringify(detail)
+    }`)
   }
 }
 </script>
