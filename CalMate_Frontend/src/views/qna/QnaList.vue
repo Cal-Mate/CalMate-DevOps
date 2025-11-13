@@ -1,18 +1,16 @@
 <template>
   <div class="qna-list-wrap">
     <section class="hero">
-      <div class="hero-icon">💬</div>
+      <div class="hero-icon">❓</div>
       <div class="hero-main">
         <h2 class="hero-title">문의사항</h2>
-        <p class="hero-sub">궁금한 점이나 문제가 있으면 언제든 문의해주세요</p>
+        <p class="hero-sub">궁금한 점이나 문제가 있다면 문의해 주세요</p>
       </div>
-      <RouterLink class="compose-btn" to="/main/qna/new">📨 문의 작성</RouterLink>
+      <RouterLink class="compose-btn" to="/main/qna/new">새 문의 작성</RouterLink>
     </section>
 
     <section class="card">
-      <div v-if="items.length === 0" class="empty">
-        아직 등록된 문의가 없습니다.
-      </div>
+      <div v-if="items.length === 0" class="empty">아직 등록된 문의가 없습니다.</div>
       <div v-else class="list">
         <article
           v-for="it in items"
@@ -22,11 +20,11 @@
         >
           <header class="item-head">
             <span class="badge cat">{{ it.category }}</span>
-            <span class="badge" :class="statusClassNew(it.status)">{{ it.status }}</span>
+            <span class="badge" :class="statusClass(it.status)">{{ it.status }}</span>
           </header>
           <h3 class="item-title">{{ it.title }}</h3>
           <p class="item-desc">{{ it.content }}</p>
-          <footer class="item-foot">{{ timeAgo(it.createdAt) }}</footer>
+          <footer class="item-foot">{{ timeAgo(it.createdAt) }} · 작성자 {{ it.author }}</footer>
         </article>
       </div>
     </section>
@@ -36,31 +34,36 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
+import { getQnaList } from '@/api/qna'
 
 const items = ref([])
 const router = useRouter()
 
-onMounted(() => {
-  const raw = localStorage.getItem('inquiries')
-  if (!raw) return
+onMounted(async () => {
   try {
-    const parsed = JSON.parse(raw)
-    if (Array.isArray(parsed)) items.value = parsed
+    const res = await getQnaList({ limit: 20, offset: 0 })
+    const list = Array.isArray(res?.data) ? res.data : []
+    items.value = list.map(it => ({
+      id: it.id,
+      category: '일반',
+      status: it.answer ? '완료' : '접수',
+      title: it.title,
+      content: it.contents,
+      createdAt: it.createdAt,
+      author: it.memberId,
+    }))
   } catch (e) {
-    console.error('Failed to parse inquiries', e)
+    console.error('Failed to load QnA list', e)
   }
 })
 
 function statusClass(s) {
   switch (s) {
-    case '대기중':
-      return 'st-wait'
-    case '처리중':
-      return 'st-proc'
-    case '완료':
-      return 'st-done'
-    default:
-      return 'st-wait'
+    case '접수': return 'st-wait'
+    case '진행중':
+    case '처리중': return 'st-proc'
+    case '완료': return 'st-done'
+    default: return 'st-wait'
   }
 }
 
@@ -73,30 +76,7 @@ function timeAgo(ts) {
     if (diff < 86400) return `${Math.floor(diff / 3600)}시간 전`
     return `${Math.floor(diff / 86400)}일 전`
   } catch {
-    return ts
-  }
-}
-
-// 새 상태 클래스 분기 (정상 한글 + 호환)
-function statusClassNew(s) {
-  switch (s) {
-    case '대기중':
-    case '대기 중':
-      return 'st-wait'
-    case '처리중':
-    case '처리 중':
-      return 'st-proc'
-    case '완료':
-      return 'st-done'
-    // 깨진 인코딩 대비 (기존 데이터 호환)
-    case '�����':
-      return 'st-wait'
-    case 'ó����':
-      return 'st-proc'
-    case '�Ϸ�':
-      return 'st-done'
-    default:
-      return 'st-wait'
+    return String(ts)
   }
 }
 
@@ -131,4 +111,3 @@ function goDetail(id) {
 .item-desc { margin: 0; font-size: 13px; color: #6b7280; }
 .item-foot { margin-top: 8px; font-size: 12px; color: #9ca3af; }
 </style>
-

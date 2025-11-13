@@ -2,9 +2,9 @@
   <div class="done-wrap">
     <header class="done-head">
       <div class="left">
-        <button class="back" type="button" @click="goBack" aria-label="돌아가기">← 돌아가기</button>
+        <button class="back" type="button" @click="goBack" aria-label="뒤로 가기">← 뒤로</button>
         <div>
-          <h2 class="title">나의 일기</h2>
+          <h2 class="title">오늘의 일기</h2>
           <p class="date">{{ dateLabel }}</p>
         </div>
       </div>
@@ -24,7 +24,7 @@
 
     <section class="card block">
       <header class="block-head">
-        <span class="icon">💙</span>
+        <span class="icon">💪</span>
         <span>오늘의 컨디션</span>
       </header>
       <div class="block-body">{{ entry?.condition || '작성된 내용이 없습니다.' }}</div>
@@ -32,30 +32,45 @@
 
     <section class="card block">
       <header class="block-head">
-        <span class="icon">📅</span>
-        <span>오늘의 이야기</span>
+        <span class="icon">📝</span>
+        <span>오늘의 메모</span>
       </header>
-      <div class="block-body">{{ entry?.notes || '작성된 내용이 없습니다.' }}</div>
+      <div class="block-body">{{ entry?.memo || '작성된 내용이 없습니다.' }}</div>
     </section>
 
-    <section class="card block" v-if="(entry?.photos || []).length">
+    <section class="card block" v-if="(entry?.files || []).length">
       <header class="block-head">
         <span class="icon">🖼️</span>
         <span>사진</span>
       </header>
       <div class="photo-list">
-        <img v-for="(p,i) in entry.photos" :key="i" :src="p" :alt="`일기 사진 ${i+1}`" />
+        <img
+          v-for="(p,i) in entry.files"
+          :key="p.id ?? i"
+          :src="resolveFileUrl(p.path)"
+          :alt="`일기 사진 ${i+1}`"
+        />
       </div>
     </section>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useToast } from '../../lib/toast.js'
+import { useUserStore } from '@/stores/user'
+import { getDiaryByDate, deleteDiary, toDiaryClientMood } from '@/api/diary'
+import { getCalendarByDay, updateCalendar } from '@/api/calendar'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
+const { success, error: toastError } = useToast()
+
+const entry = ref(null)
+const isLoading = ref(false)
+const memberId = computed(() => userStore.userId || null)
 
 const dateKey = computed(() => {
   const q = route.query?.date
@@ -63,45 +78,106 @@ const dateKey = computed(() => {
   return new Date().toISOString().split('T')[0]
 })
 
-const entries = computed(() => {
-  try { return JSON.parse(localStorage.getItem('journalEntries') || '[]') } catch { return [] }
-})
-
-const entry = computed(() => entries.value.find(e => e.date === dateKey.value) || null)
-
 const dateLabel = computed(() => {
-  try { return new Date(dateKey.value).toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'long' }) } catch { return dateKey.value }
+  try {
+    return new Date(dateKey.value).toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'long'
+    })
+  } catch {
+    return dateKey.value
+  }
 })
 
 const moodMap = {
-  great: { label: '아주 좋음', icon: '😁' },
-  good: { label: '좋음', icon: '🙂' },
-  okay: { label: '보통', icon: '😐' },
-  bad: { label: '나쁨', icon: '☹️' },
-  terrible: { label: '아주 나쁨', icon: '😫' },
+  great:    { label: '아주 좋음',   icon: '😄' },
+  good:     { label: '좋음',       icon: '🙂' },
+  okay:     { label: '보통',       icon: '😐' },
+  bad:      { label: '나쁨',       icon: '🙁' },
+  terrible: { label: '아주 나쁨',  icon: '😣' }
 }
 
-const moodLabel = computed(() => moodMap[entry.value?.mood]?.label || '기록 없음')
-const moodIcon = computed(() => moodMap[entry.value?.mood]?.icon || '📝')
+const clientMood = computed(() => (entry.value?.mood ? toDiaryClientMood(entry.value.mood) : null))
+const moodLabel = computed(() => moodMap[clientMood.value]?.label || '기록 없음')
+const moodIcon = computed(() => moodMap[clientMood.value]?.icon || '🙂')
 
-function goBack(){
-  if (history.length > 1) router.back(); else router.push({ name: 'main-calendar' })
+watch(
+  () => [dateKey.value, memberId.value],
+  () => {
+    loadDiary()
+  },
+  { immediate: true }
+)
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081'
+const resolveFileUrl = (path) => {
+  if (!path) return ''
+  if (/^https?:/i.test(path)) return path
+  return `${API_BASE_URL}${path}`
 }
 
-function editEntry(){
-  router.push({ name: 'main-diary', query: { date: dateKey.value } })
-}
-
-function deleteEntry(){
-  if (!confirm('이 날짜의 일기를 삭제할까요?')) return
+async function loadDiary() {
+  if (!memberId.value) {
+    entry.value = null
+    return
+  }
+  isLoading.value = true
   try {
-    const raw = localStorage.getItem('journalEntries')
-    const arr = raw ? JSON.parse(raw) : []
-    const filtered = Array.isArray(arr) ? arr.filter(e => e?.date !== dateKey.value) : []
-    localStorage.setItem('journalEntries', JSON.stringify(filtered))
-  } catch {}
-  // 삭제 후 작성 페이지로 유도
+    const { data } = await getDiaryByDate({
+      memberId: memberId.value,
+      date: dateKey.value
+    })
+    entry.value = Array.isArray(data) && data.length ? data[0] : null
+  } catch (error) {
+    console.error('loadDiary error', error)
+    toastError('일기를 불러오는 중 오류가 발생했습니다.')
+    entry.value = null
+  } finally {
+    isLoading.value = false
+  }
+}
+
+function goBack() {
+  if (history.length > 1) {
+    router.back()
+  } else {
+    router.push({ name: 'main-calendar' })
+  }
+}
+
+function editEntry() {
   router.push({ name: 'main-diary', query: { date: dateKey.value } })
+}
+
+async function deleteEntry() {
+  if (!entry.value?.id) return
+  if (!confirm('해당 일기를 삭제하시겠습니까?')) return
+  try {
+    await deleteDiary(entry.value.id)
+    await syncCalendarDiaryStatus()
+    success('일기가 삭제되었습니다.')
+    router.push({ name: 'main-diary', query: { date: dateKey.value } })
+  } catch (error) {
+    console.error('deleteDiary error', error)
+    toastError('일기를 삭제하는 중 오류가 발생했습니다.')
+  }
+}
+
+async function syncCalendarDiaryStatus() {
+  if (!memberId.value) return
+  try {
+    const { data } = await getCalendarByDay({
+      memberId: memberId.value,
+      day: dateKey.value
+    })
+    if (data?.id) {
+      await updateCalendar({ id: data.id, diaryStatus: 0 })
+    }
+  } catch (error) {
+    console.error('calendar sync error', error)
+  }
 }
 </script>
 
