@@ -152,7 +152,8 @@ import TabsTrigger from '@/components/event/ui/TabsTrigger.vue';
 import TabsContent from '@/components/event/ui/TabsContent.vue';
 import BingoBoard from '@/components/event/bingo/Monthlybingochallenge.vue';
 import LuckyDraw from '@/components/event/gacha/LuckyDraw.vue';
-import { fetchPointSummary, fetchPointHistory } from '@/api/points';
+import { fetchPointSummary, fetchPointHistory } from '@/api/eventpoints';
+import { fetchBadgeCountRange } from '@/api/pointcalendar';
 import { useUserStore } from '@/stores/user';
 import { LUCKY_DRAW_TICKET_COST, calculateTotalPoints, calculateStreak } from '@/components/event/lib/pointsSystem.js';
 
@@ -181,6 +182,7 @@ const memberId = computed(() => userStore.userId);
 const totalPoints = ref(0);
 const streak = ref(0);
 const badges = ref([]);
+const badgeCount = ref(0);
 const activeTab = ref('achievements');
 
 const availablePoints = computed(() => Math.max(0, totalPoints.value));
@@ -213,7 +215,7 @@ const statCards = computed(() => [
   {
     id: 'badges',
     label: '획득 뱃지',
-    value: formatNumber(badges.value.length),
+    value: formatNumber(badgeCount.value),
     suffix: '개',
     helper: '업적 달성 현황',
     icon: Award,
@@ -279,29 +281,35 @@ async function loadPointsData() {
   const { points: fallbackPoints } = calculateTotalPoints(resolvedProfile.value);
   const currentStreak = calculateStreak();
   streak.value = currentStreak;
+  const { startDate, endDate } = getCurrentMonthRange();
 
   if (!memberId.value) {
     totalPoints.value = fallbackPoints;
     updateBadges(fallbackPoints, currentStreak);
     pointHistories.value = [];
+    badgeCount.value = badges.value.length;
     return;
   }
 
   try {
-    const [summary, histories] = await Promise.all([
+    const [summary, histories, badgeSummary] = await Promise.all([
       fetchPointSummary(memberId.value),
       fetchPointHistory(memberId.value, 40),
+      fetchBadgeCountRange({ memberId: memberId.value, startDate, endDate }),
     ]);
 
     const currentPoint = summary?.currentPoint ?? fallbackPoints;
     totalPoints.value = currentPoint;
     updateBadges(currentPoint, currentStreak);
     pointHistories.value = normalizeHistories(histories);
+    badgeCount.value =
+      typeof badgeSummary?.badgeCount === 'number' ? badgeSummary.badgeCount : badges.value.length;
   } catch (error) {
     console.warn('Failed to load member points. Falling back to profile data.', error);
     totalPoints.value = fallbackPoints;
     updateBadges(fallbackPoints, currentStreak);
     pointHistories.value = [];
+    badgeCount.value = badges.value.length;
   }
 }
 
@@ -320,9 +328,15 @@ function normalizeHistories(items) {
   return items
     .map((item) => {
       if (!item) return null;
+      const occurredAtDate = parseHistoryDate(
+        item.occurredAt ?? item.historyTime ?? item.history_time ?? item.historyDate ?? item.createdAt,
+      );
+      const formattedDate = occurredAtDate ? formatHistoryDate(occurredAtDate) : '-';
       return {
         title: item.title || (item.type === 'EARN' ? '포인트 적립' : '포인트 사용'),
-        date: formatHistoryDate(item.occurredAt),
+        occurredAt: occurredAtDate ? occurredAtDate.toISOString() : null,
+        date: formattedDate,
+        dateLabel: formattedDate,
         points: item.points ?? 0,
         type: item.type || 'EARN',
       };
@@ -330,17 +344,37 @@ function normalizeHistories(items) {
     .filter(Boolean);
 }
 
-function formatHistoryDate(value) {
-  if (!value) return '-';
-  if (typeof value === 'string') {
-    return value.replace('T', ' ');
+function parseHistoryDate(value) {
+  if (!value && value !== 0) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
   }
-  const date = new Date(value);
+  if (typeof value === 'number') {
+    const ms = value > 1e12 ? value : value * 1000;
+    const date = new Date(ms);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (/^\d+$/.test(trimmed)) {
+      return parseHistoryDate(Number(trimmed));
+    }
+    const normalized = trimmed.includes('T') ? trimmed : trimmed.replace(' ', 'T');
+    const date = new Date(normalized);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return null;
+}
+
+function formatHistoryDate(value) {
+  const date = value instanceof Date ? value : parseHistoryDate(value);
+  if (!date) return '-';
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
     date.getDate(),
   ).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(
     date.getMinutes(),
-  ).padStart(2, '0')}`;
+  ).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
 }
 
 function onStatItemClick(item) {
@@ -358,6 +392,22 @@ function handlePointsUsed(pointsToUse) {
 
 function formatNumber(value) {
   return Number(value || 0).toLocaleString();
+}
+
+function getCurrentMonthRange(referenceDate = new Date()) {
+  const start = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
+  const end = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0);
+  return {
+    startDate: formatDateInput(start),
+    endDate: formatDateInput(end),
+  };
+}
+
+function formatDateInput(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 </script>
 

@@ -1,4 +1,5 @@
 import { POINTS_RULES } from './pointsSystem.js';
+import { getCurrentYearMonthInKst } from '@/utils/date.js';
 
 export const BINGO_TASKS = [
   { id: 'hydrate', label: '💧', description: '물 2L 마시기' },
@@ -71,7 +72,7 @@ const createCell = (task, monthKey, index) => ({
   points: task.points ?? POINTS_RULES.BINGO_LINE,
 });
 
-export function generateBingoBoard(monthKey = new Date().toISOString().slice(0, 7)) {
+export function generateBingoBoard(monthKey = getCurrentYearMonthInKst()) {
   const tasks = seededShuffle(BINGO_TASKS, monthKey);
   const board = [];
 

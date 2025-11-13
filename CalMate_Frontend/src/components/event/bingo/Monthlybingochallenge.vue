@@ -43,6 +43,7 @@ import BingoBoardCard from './Bingoboardcard.vue';
 import BingoVerificationModal from './BingoVerificationModal.vue';
 import { POINTS_RULES } from '../lib/pointsSystem.js';
 import { useToast } from '../lib/toast.js';
+import { getCurrentYearMonthInKst } from '@/utils/date.js';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081').replace(/\/$/, '');
 const DEFAULT_EXTEND_FILE_PATH_ID = Number(import.meta.env.VITE_BINGO_EXTEND_FILE_PATH_ID ?? '') || null;
@@ -66,7 +67,7 @@ export default defineComponent({
     const { error } = useToast();
     const memberId = computed(() => userStore.userId || null);
     const extendFilePathId = DEFAULT_EXTEND_FILE_PATH_ID;
-    const currentMonth = new Date().toISOString().slice(0, 7);
+    const currentMonth = getCurrentYearMonthInKst();
 
     const calculatePoints = (detail) => {
       const lines = detail?.completedLineCount ?? 0;

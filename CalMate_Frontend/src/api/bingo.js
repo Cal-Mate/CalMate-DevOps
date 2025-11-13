@@ -37,3 +37,26 @@ export async function checkBingoCell({ boardId, cellId, memberId, file, extendFi
   );
   return data;
 }
+
+export async function cancelBingoCellCheck({ boardId, cellId, memberId }) {
+  if (!boardId || !cellId || !memberId) {
+    throw new Error('boardId, cellId, memberId are required');
+  }
+
+  const params = { memberId };
+  const { data } = await api.delete(
+    `${BASE_PATH}/boards/${boardId}/cells/${cellId}/check`,
+    { params },
+  );
+  return data;
+}
+
+export async function deleteBingoFile({ fileId, memberId }) {
+  if (!fileId || !memberId) {
+    throw new Error('fileId, memberId are required');
+  }
+
+  const params = { memberId };
+  const { data } = await api.delete(`${BASE_PATH}/files/${fileId}`, { params });
+  return data;
+}

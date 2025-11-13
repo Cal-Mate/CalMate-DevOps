@@ -23,6 +23,9 @@
               </p>
             </div>
           </div>
+          <p v-if="historyRangeLabel" class="phm-range">
+            최근 {{ recent20.length }}건 · {{ historyRangeLabel }}
+          </p>
 
           <!-- 최근 20건 리스트 -->
           <div class="phm-content">
@@ -40,7 +43,7 @@
                   <div class="phm-row-left">
                     <p class="phm-row-title">{{ h.title }}</p>
                     <p class="phm-row-sub">
-                      {{ h.date }} · {{ h.type === 'EARN' ? '적립' : '사용' }}
+                      {{ h.type === 'EARN' ? '적립 일시' : '차감 일시' }} · {{ getHistoryDateLabel(h) }}
                     </p>
                   </div>
                   <div :class="['phm-row-amt', h.type === 'EARN' ? 'is-earn' : 'is-use']">
@@ -61,7 +64,7 @@ import { computed } from 'vue';
 
 const props = defineProps({
   open: { type: Boolean, default: false },
-  /** [{ title, date:'YYYY-MM-DD HH:mm', points:number, type:'EARN'|'USE' }] */
+  /** [{ title, date:'YYYY-MM-DD HH:mm', points:number, type:'EARN'|'USE', occurredAt?: string }] */
   histories: { type: Array, default: () => [] },
 });
 const emit = defineEmits(['update:open', 'close']);
@@ -73,9 +76,25 @@ function close() {
 
 const recent20 = computed(() =>
   [...(props.histories || [])]
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .sort((a, b) => (getHistoryTimestamp(b) ?? 0) - (getHistoryTimestamp(a) ?? 0))
     .slice(0, 20)
 );
+
+const historyRangeLabel = computed(() => {
+  const timestamps = recent20.value
+    .map((history) => getHistoryTimestamp(history))
+    .filter((value) => typeof value === 'number')
+    .sort((a, b) => a - b);
+
+  if (!timestamps.length) return '';
+  const start = new Date(timestamps[0]);
+  const end = new Date(timestamps[timestamps.length - 1]);
+
+  if (start.toDateString() === end.toDateString()) {
+    return `${formatDateLabel(end)} 기록`;
+  }
+  return `${formatDateLabel(start)} ~ ${formatDateLabel(end)}`;
+});
 
 // ✅ 상단 요약도 최근 20건만 합산
 const earnedTotalRecent = computed(() =>
@@ -87,6 +106,62 @@ const usedTotalRecent = computed(() =>
 
 function formatNumber(v) {
   return Number(v || 0).toLocaleString();
+}
+
+function formatDateLabel(date) {
+  return date.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+}
+
+function getHistoryTimestamp(history) {
+  if (!history) return null;
+  return toTimestamp(
+    history.occurredAt ??
+      history.historyTime ??
+      history.history_time ??
+      history.date ??
+      history.dateLabel ??
+      null,
+  );
+}
+
+function getHistoryDateLabel(history) {
+  if (!history) return '-';
+  if (typeof history.dateLabel === 'string' && history.dateLabel.trim()) return history.dateLabel;
+  if (typeof history.date === 'string' && history.date.trim()) return history.date;
+
+  const timestamp = getHistoryTimestamp(history);
+  if (timestamp == null) return '-';
+  return formatDateTime(new Date(timestamp));
+}
+
+function toTimestamp(value) {
+  if (value == null) return null;
+  if (value instanceof Date) {
+    const time = value.getTime();
+    return Number.isNaN(time) ? null : time;
+  }
+  if (typeof value === 'number') {
+    return value > 1e12 ? value : value * 1000;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (/^\d+$/.test(trimmed)) return toTimestamp(Number(trimmed));
+    const normalized = trimmed.includes('T') ? trimmed : trimmed.replace(' ', 'T');
+    const parsed = Date.parse(normalized);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+}
+
+function formatDateTime(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+    date.getDate(),
+  ).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(
+    date.getMinutes(),
+  ).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
 }
 </script>
 
@@ -104,6 +179,7 @@ function formatNumber(v) {
 .phm-chip-label { color:#64748b; font-size:1rem; font-weight: 800; letter-spacing: .02em; }
 .phm-chip-value { margin-top:10px; font-weight:800; font-size:2rem; color:#0f172a; }
 .phm-chip-value span { margin-left:6px; font-size:1rem; color:#94a3b8; }
+.phm-range { padding: 0 16px 8px; font-size: .85rem; color: #64748b; }
 
 .phm-content { padding: 8px 16px 16px; max-height: 56vh; overflow:auto; }
 

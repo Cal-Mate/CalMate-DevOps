@@ -60,7 +60,16 @@
               {{ currentCell && currentCell.completed ? '닫기' : '취소' }}
             </Button>
             <Button
-              v-if="!(currentCell && currentCell.completed)"
+              v-if="currentCell && currentCell.completed"
+              variant="destructive"
+              class="cancel-button"
+              :disabled="isCancelling"
+              @click="handleCancelVerification"
+            >
+              {{ isCancelling ? '취소 중...' : '인증 취소' }}
+            </Button>
+            <Button
+              v-else
               class="submit-button"
               :disabled="!uploadedFile || isSubmitting"
               @click="handleSubmitVerification"
@@ -80,7 +89,7 @@ import { Camera, X } from 'lucide-vue-next';
 import Button from '../ui/Button.vue';
 import Input from '../ui/Input.vue';
 import { useToast } from '../lib/toast.js';
-import { checkBingoCell } from '@/api/bingo';
+import { cancelBingoCellCheck, checkBingoCell, deleteBingoFile } from '@/api/bingo';
 
 export default defineComponent({
   name: 'BingoVerificationModal',
@@ -118,6 +127,7 @@ export default defineComponent({
     const uploadedFile = ref(null);
     const uploadedPreview = ref(null);
     const isSubmitting = ref(false);
+    const isCancelling = ref(false);
     const isOpen = computed(() => Boolean(props.selectedCell));
 
     const currentCell = computed(() => {
@@ -134,6 +144,8 @@ export default defineComponent({
       () => props.selectedCell,
       () => {
         resetImage();
+        isSubmitting.value = false;
+        isCancelling.value = false;
       },
     );
 
@@ -211,8 +223,89 @@ export default defineComponent({
       }
     }
 
+    const normalizeUploadId = (upload) => {
+      if (!upload || typeof upload !== 'object') return null;
+      const candidate =
+        upload.uploadId ??
+        upload.id ??
+        upload.fileId ??
+        upload.file?.uploadId ??
+        upload.file?.id ??
+        upload.file?.fileId ??
+        null;
+
+      if (candidate == null) return null;
+      const numeric = Number(candidate);
+      return Number.isFinite(numeric) ? numeric : candidate;
+    };
+
+    const extractUploadFileIds = (cell) => {
+      if (!cell?.uploads?.length) return [];
+      const ids = [];
+
+      cell.uploads.forEach((upload) => {
+        const id = normalizeUploadId(upload);
+        if (id == null) return;
+        if (!ids.includes(id)) {
+          ids.push(id);
+        }
+      });
+
+      return ids;
+    };
+
+    async function handleCancelVerification() {
+      if (!props.selectedCell || !currentCell.value) {
+        error('취소할 셀을 선택해주세요.');
+        return;
+      }
+      if (!currentCell.value.completed) {
+        error('아직 인증되지 않은 셀입니다.');
+        return;
+      }
+      if (!props.boardId || !props.memberId) {
+        error('사용자 정보를 확인할 수 없습니다.');
+        return;
+      }
+
+      const fileIds = extractUploadFileIds(currentCell.value);
+
+      const confirmed = window.confirm('등록된 인증을 취소할까요? 업로드한 사진이 삭제됩니다.');
+      if (!confirmed) return;
+
+      isCancelling.value = true;
+      try {
+        if (fileIds.length) {
+          await Promise.all(
+            fileIds.map((fileId) =>
+              deleteBingoFile({
+                fileId,
+                memberId: props.memberId,
+              }),
+            ),
+          );
+        }
+
+        await cancelBingoCellCheck({
+          boardId: props.boardId,
+          cellId: currentCell.value.cellId ?? currentCell.value.id,
+          memberId: props.memberId,
+        });
+        success('인증을 취소했어요.');
+        emit('verification-success');
+        closeModal();
+      } catch (err) {
+        console.error(err);
+        error('인증 취소에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      } finally {
+        isCancelling.value = false;
+      }
+    }
+
     function closeModal() {
       resetImage();
+      isSubmitting.value = false;
+      isCancelling.value = false;
       emit('close');
     }
 
@@ -247,9 +340,11 @@ export default defineComponent({
       isSubmitting,
       handleImageChange,
       handleSubmitVerification,
+      handleCancelVerification,
       closeModal,
       resetImage,
       formatDate,
+      isCancelling,
     };
   },
 });
@@ -390,7 +485,8 @@ export default defineComponent({
   gap: 0.75rem;
 }
 
-.submit-button {
+.submit-button,
+.cancel-button {
   min-width: 110px;
 }
 
