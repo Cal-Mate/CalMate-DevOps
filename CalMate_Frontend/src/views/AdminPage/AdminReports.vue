@@ -166,135 +166,190 @@
 </template>
 
 <script setup>
-/* 매우 자세한 주석 포함 */
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import EmptyState from '@/components/admin/EmptyState.vue'
 import PaginationLite from '@/components/admin/PaginationLite.vue'
 import ConfirmModal from '@/components/admin/ConfirmModal.vue'
 import ReportTypeBadge from '@/components/admin/ReportTypeBadge.vue'
 import ReportStatusBadge from '@/components/admin/ReportStatusBadge.vue'
+import { fetchAllReports, processReport } from '@/api/report'
 
-/* ============ 1) 검색/필터/페이지 상태 ============ */
-const query = ref('')           // 검색 키워드(신고자/대상/사유)
-const type = ref('all')         // 유형 필터('all'|'post'|'user')
-const status = ref('all')       // 상태 필터('all'|'pending'|'resolved'|'rejected')
-const page = ref(1)             // 현재 페이지(1-base)
-const pageSize = 10             // 페이지 당 행 수
 
-/* ============ 2) 목록 데이터(데모) ============ */
-/* 실제 사용 시 API로 교체하세요 */
-const rows = ref([
-  // id: 키, reporter: 신고자, target: 대상(게시물 제목/사용자명 등), type: 'post'|'user'
-  // reason: 사유, status: 'pending'|'resolved'|'rejected', when: '33분 전' 등
-  { id: 101, reporter: '김철수', target: '스팸 게시물', type: 'post', reason: '스팸/광고', status: 'pending',  when: '33분 전' },
-  { id: 102, reporter: '이영희', target: '악성 유저',   type: 'user', reason: '욕설/비방', status: 'pending',  when: '2시간 전' },
-  { id: 103, reporter: '박민수', target: '모욕성 댓글', type: 'post', reason: '혐오 표현', status: 'resolved', when: '하루 전' },
-  { id: 104, reporter: '홍길동', target: '도배 사용자', type: 'user', reason: '도배 행위', status: 'rejected', when: '3일 전' },
-])
+const query = ref('')
+const type = ref('all')
+const status = ref('all')
+const page = ref(1)
+const pageSize = 10
 
-/* ============ 3) 체크박스 선택 상태(일괄 처리용) ============ */
-const checkedIds = ref([])         // 체크된 신고 id 배열
-const isAllChecked = computed(() => { // 현재 페이지 행이 모두 선택인지
-  const ids = pagedRows.value.map(r=>r.id)
-  return ids.length>0 && ids.every(id => checkedIds.value.includes(id))
+const rows = ref([])
+const loading = ref(false)
+
+onMounted(loadReports)
+
+async function loadReports() {
+  loading.value = true
+  try {
+    const data = await fetchAllReports()
+    const items = data?.items ?? []
+    rows.value = items.map(mapReportItem)
+  } finally {
+    loading.value = false
+  }
+}
+
+function mapReportItem(item) {
+  const isPost = item.postId != null
+  const when = formatDate(item.date)
+  return {
+    id: item.id,
+    reporter: item.reporterName,
+    target: item.reportedName || (isPost ? `게시글 #${item.postId}` : `회원 #${item.reportedId}`),
+    type: isPost ? 'post' : 'user',
+    reason: item.reportBaseTitle,
+    status: item.yn ? 'resolved' : 'pending',
+    when,
+  }
+}
+
+const checkedIds = ref([])
+const isAllChecked = computed(() => {
+  const ids = pagedRows.value.map(r => r.id)
+  return ids.length > 0 && ids.every(id => checkedIds.value.includes(id))
 })
-function toggleAll(checked){
-  const ids = pagedRows.value.map(r=>r.id)
-  if(checked){
+function toggleAll(checked) {
+  const ids = pagedRows.value.map(r => r.id)
+  if (checked) {
     checkedIds.value = Array.from(new Set([...checkedIds.value, ...ids]))
-  }else{
+  } else {
     checkedIds.value = checkedIds.value.filter(id => !ids.includes(id))
   }
 }
-function toggleOne(id, checked){
-  if(checked){
-    if(!checkedIds.value.includes(id)) checkedIds.value.push(id)
-  }else{
-    checkedIds.value = checkedIds.value.filter(x=>x!==id)
+function toggleOne(id, checked) {
+  if (checked) {
+    if (!checkedIds.value.includes(id)) checkedIds.value.push(id)
+  } else {
+    checkedIds.value = checkedIds.value.filter(x => x !== id)
   }
 }
 
-/* ============ 4) 파생 데이터(필터/검색/페이징) ============ */
 const filtered = computed(() => {
   const q = query.value.toLowerCase().trim()
   return rows.value.filter(r => {
-    const typeOk = type.value==='all' ? true : r.type===type.value
-    const statusOk = status.value==='all' ? true : r.status===status.value
-    const searchOk = !q || [r.reporter, r.target, r.reason].some(v => String(v).toLowerCase().includes(q))
+    const typeOk = type.value === 'all' ? true : r.type === type.value
+    const statusOk = status.value === 'all' ? true : r.status === status.value
+    const searchOk =
+      !q ||
+      [r.reporter, r.target, r.reason].some(v =>
+        String(v).toLowerCase().includes(q),
+      )
     return typeOk && statusOk && searchOk
   })
 })
-const start = computed(() => (page.value-1)*pageSize)
+const start = computed(() => (page.value - 1) * pageSize)
 const end = computed(() => start.value + pageSize)
 const pagedRows = computed(() => filtered.value.slice(start.value, end.value))
 
-/* ============ 5) 검색/초기화 핸들러 ============ */
-function applyFilters(){ page.value = 1 }
-function resetFilters(){ query.value=''; type.value='all'; status.value='all'; page.value=1 }
+function applyFilters() {
+  page.value = 1
+}
+function resetFilters() {
+  query.value = ''
+  type.value = 'all'
+  status.value = 'all'
+  page.value = 1
+}
 
-/* ============ 6) 개별/일괄 처리 모달 ============ */
 const confirm = ref({
-  open:false,                 // 모달 표시 여부
-  mode:'single',              // 'single' | 'bulk'
-  action:null,                // 'resolve' | 'reject'
-  targetIds:[],               // 처리 대상 id 목록
-  title:'', message:'', okText:'확인'
+  open: false,
+  mode: 'single',
+  action: null,
+  targetIds: [],
+  title: '',
+  message: '',
+  okText: '확인',
 })
 
-/* 개별 오픈 */
-function openSingle(row, action){
-  confirm.value.mode='single'
-  confirm.value.action=action
-  confirm.value.targetIds=[row.id]
+function openSingle(row, action) {
+  confirm.value.mode = 'single'
+  confirm.value.action = action
+  confirm.value.targetIds = [row.id]
   const dict = {
-    resolve: {t:'신고 처리', m:`이 신고를 '처리완료'로 변경할까요?`, ok:'처리'},
-    reject:  {t:'신고 반려', m:`이 신고를 '반려'로 변경할까요?`, ok:'반려'},
+    resolve: { t: '신고 처리', m: `이 신고를 '처리완료'로 변경할까요?`, ok: '처리' },
+    reject: { t: '신고 반려', m: `이 신고를 '반려'로 변경할까요?`, ok: '반려' },
   }
   confirm.value.title = dict[action].t
   confirm.value.message = `${row.reporter} → ${row.target}\n사유: ${row.reason}\n${dict[action].m}`
   confirm.value.okText = dict[action].ok
-  confirm.value.open=true
+  confirm.value.open = true
 }
 
-/* 일괄 오픈 */
-function openBulk(action){
-  if(checkedIds.value.length===0) return
-  confirm.value.mode='bulk'
-  confirm.value.action=action
-  confirm.value.targetIds=[...checkedIds.value]
+function openBulk(action) {
+  if (checkedIds.value.length === 0) return
+  confirm.value.mode = 'bulk'
+  confirm.value.action = action
+  confirm.value.targetIds = [...checkedIds.value]
   const dict = {
-    resolve: {t:'선택 신고 처리', m:`선택된 ${checkedIds.value.length}건을 '처리완료'로 변경할까요?`, ok:'일괄 처리'},
-    reject:  {t:'선택 신고 반려', m:`선택된 ${checkedIds.value.length}건을 '반려'로 변경할까요?`, ok:'일괄 반려'},
+    resolve: {
+      t: '선택 신고 처리',
+      m: `선택된 ${checkedIds.value.length}건을 '처리완료'로 변경할까요?`,
+      ok: '일괄 처리',
+    },
+    reject: {
+      t: '선택 신고 반려',
+      m: `선택된 ${checkedIds.value.length}건을 '반려'로 변경할까요?`,
+      ok: '일괄 반려',
+    },
   }
   confirm.value.title = dict[action].t
   confirm.value.message = dict[action].m
   confirm.value.okText = dict[action].ok
-  confirm.value.open=true
+  confirm.value.open = true
 }
 
-/* 모달 확인 → 실제 상태 변경(데모는 로컬 변경, 실제는 API 호출 후 rows 갱신) */
-function applyAction(){
+async function applyAction() {
   const { action, targetIds } = confirm.value
-  rows.value = rows.value.map(r => {
-    if(targetIds.includes(r.id)){
-      if(action==='resolve') r.status='resolved'
-      if(action==='reject')  r.status='rejected'
+
+  try {
+    if (action === 'resolve') {
+      // ✅ 백엔드에 실제 처리 요청
+      await Promise.all(targetIds.map(id => processReport(id)))
+      // 목록 다시 로딩
+      await loadReports()
+    } else if (action === 'reject') {
+      // ❗ 아직 반려용 API는 없으니까 프론트 상태만 변경
+      rows.value = rows.value.map(r => {
+        if (targetIds.includes(r.id)) r.status = 'rejected'
+        return r
+      })
     }
-    return r
-  })
-  // 선택 초기화 및 모달 닫기
-  checkedIds.value = []
-  confirm.value.open=false
+  } finally {
+    checkedIds.value = []
+    confirm.value.open = false
+  }
 }
 
-/* ============ 7) 유틸 ============ */
-function initials (name) {
+
+function initials(name) {
   if (!name) return 'U'
   const parts = String(name).trim().split(/\s+/)
   if (parts.length === 1) return parts[0].slice(0, 2)
   return parts[0].slice(0, 1) + parts[1].slice(0, 1)
 }
+
+function formatDate(v) {
+  if (!v) return ''
+  const d = new Date(v)
+  if (Number.isNaN(d.getTime())) return String(v)
+  return d.toLocaleString('ko-KR', {
+    year: '2-digit',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
 </script>
+
 
 <style scoped>
 /* 레이아웃 여백 */
