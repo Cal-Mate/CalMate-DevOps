@@ -12,7 +12,6 @@ export function reasonToBaseId(reason) {
 
 const n = v => (v === undefined || v === null || v === '' ? null : Number(v))
 
-// ✅ 확정 스펙: /reports (FormData: request(JSON Blob) + files[])
 export async function createReport(payload, files = []) {
   const p = {
     title: String(payload.title ?? ''),
@@ -20,7 +19,7 @@ export async function createReport(payload, files = []) {
     reportedMemberId: n(payload.reportedMemberId),
     reporterMemberId: n(payload.reporterMemberId),
     postId: n(payload.postId),
-    commentId: n(payload.commentId),   // 댓글 신고 아니면 null 유지
+    commentId: n(payload.commentId),
     reportBaseId: n(payload.reportBaseId),
   }
 
@@ -28,6 +27,14 @@ export async function createReport(payload, files = []) {
   fd.append('request', new Blob([JSON.stringify(p)], { type: 'application/json' }))
   ;(files || []).forEach(f => f && fd.append('files', f))
 
-  // Axios가 FormData면 content-type 자동 설정됨(경계(boundary) 포함) → 헤더 수동 지정 불필요
   return api.post('/reports', fd)
+}
+
+export async function fetchAllReports() {
+  const res = await api.get('/reports/all')
+  return res.data
+}
+
+export async function processReport(id) {
+  return api.patch(`/reports/${id}/process`)
 }
