@@ -30,7 +30,12 @@
           <span class="bingo-cell__label">{{ item.cell.label }}</span>
         </template>
         <template v-else>
-          <span class="bingo-emoji">{{ item.cell.label }}</span>
+          <div class="bingo-cell__body">
+            <span class="bingo-cell__title">{{ item.cell.label }}</span>
+            <span v-if="item.cell.description && item.cell.description !== item.cell.label" class="bingo-cell__desc">
+              {{ item.cell.description }}
+            </span>
+          </div>
         </template>
       </button>
     </div>
@@ -168,26 +173,28 @@ export default defineComponent({
 
 .bingo-cell {
   aspect-ratio: 1 / 1;
-  border-radius: 22px;
+  border-radius: 18px;
   border: 1px solid #e5e7eb;
-  background: #fbfbfe;
+  background: #fff;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.75rem;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 1rem;
+  text-align: left;
   position: relative;
-  transition: transform 0.15s ease, border-color 0.2s ease;
+  transition: transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .bingo-cell:hover {
   transform: translateY(-2px);
-  border-color: #c7d2fe;
+  border-color: #d4d8f0;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
 }
 
 .bingo-cell--done {
-  border-color: #a78bfa;
-  background: #f5f3ff;
-  box-shadow: inset 0 0 0 2px rgba(167, 139, 250, 0.3);
+  border-color: #c4d7f4;
+  background: #f4f7ff;
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.35);
 }
 
 .bingo-photo {
@@ -209,6 +216,29 @@ export default defineComponent({
 
 .bingo-emoji {
   font-size: 2rem;
+}
+
+.bingo-cell__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.bingo-cell__title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.4;
+}
+
+.bingo-cell__desc {
+  font-size: 0.85rem;
+  color: #64748b;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .bingo-footer {

@@ -54,3 +54,13 @@ export async function fetchMemberDrawHistory(memberId, eventId, page = 1, size =
   });
   return data;
 }
+
+export async function drawGacha(eventId, memberId, cellId) {
+  if (!eventId || !memberId || !cellId) {
+    throw new Error('eventId, memberId and cellId are required');
+  }
+  const { data } = await api.post(`${BASE_PATH}/event/${eventId}/draw`, null, {
+    params: { memberId, cellId },
+  });
+  return data;
+}

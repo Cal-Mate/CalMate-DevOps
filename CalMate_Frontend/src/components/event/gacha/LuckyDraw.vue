@@ -131,7 +131,17 @@
             <p>축하합니다!</p>
           </div>
           <div class="reward-modal__body">
-            <div class="reward-modal__emoji">{{ getRewardEmoji(currentReward.type) }}</div>
+            <div class="reward-modal__image-wrapper">
+              <img
+                v-if="currentRewardImage"
+                :src="currentRewardImage"
+                :alt="currentReward.name"
+                class="reward-modal__image"
+              />
+              <div v-else class="reward-modal__image-fallback">
+                {{ getRewardEmoji(currentReward.type) }}
+              </div>
+            </div>
             <div class="reward-modal__details">
               <p class="reward-modal__name">{{ currentReward.name }}</p>
               <p class="reward-modal__desc">{{ currentReward.description }}</p>
@@ -158,13 +168,18 @@ import {
   fetchActiveGachaEvent,
   fetchEventPrizes,
   fetchMemberBoardCells,
-  openBoardCell,
-  recordGachaDrawLog,
+  drawGacha,
 } from '@/api/gacha';
 import Badge from '../ui/Badge.vue';
 import VintageDrawBoard from './VintageDrawBoard.vue';
 import { drawReward as drawRewardFallback } from '../lib/rewardsData.js';
 import { LUCKY_DRAW_TICKET_COST } from '../lib/pointsSystem.js';
+import { Client } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
+
+const DEFAULT_API_BASE_URL = 'http://localhost:8081';
+const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
+const WS_BASE_URL = (import.meta.env?.VITE_WS_BASE_URL || API_BASE_URL).replace(/\/$/, '');
 
 const props = defineProps({
   availablePoints: {
@@ -184,6 +199,8 @@ const showResult = ref(false);
 const lastPickedSlot = ref(null);
 const rewardModalListener = ref(null);
 const boardResetTimer = ref(null);
+const stompClient = ref(null);
+const subscription = ref(null);
 
 const boardCells = ref([]);
 const boardSnapshot = ref(null);
@@ -194,6 +211,7 @@ const isDrawing = ref(false);
 const isAutoDrawing = ref(false);
 const autoDrawPending = ref(0);
 const loadError = ref('');
+const currentRewardImage = computed(() => getRewardImage(currentReward.value));
 
 const localRevealedSlots = ref(new Set());
 const LOCAL_REWARD_KEY = 'wonRewards';
@@ -207,7 +225,7 @@ const BOARD_RESET_DELAY_MS = 400;
 const rarityConfig = {
   common: {
     key: 'common',
-    label: '꽝',
+    label: '일반',
     emoji: '⚪',
     chance: 70,
   },
@@ -232,6 +250,20 @@ const rarityConfig = {
 };
 
 const rarityOrder = ['common', 'rare', 'epic', 'legendary'];
+const rarityImageMap = {
+  common: new URL('@/assets/images/gacha/reward-common.svg', import.meta.url).href,
+  rare: new URL('@/assets/images/gacha/reward-rare.svg', import.meta.url).href,
+  epic: new URL('@/assets/images/gacha/reward-epic.svg', import.meta.url).href,
+  legendary: new URL('@/assets/images/gacha/reward-legendary.svg', import.meta.url).href,
+};
+const DEFAULT_REWARD_IMAGE = new URL('@/assets/images/gacha/reward-default.svg', import.meta.url).href;
+const rewardNameImageMap = {
+  '다이아몬드 상자': rarityImageMap.legendary,
+  '골드 쿠폰': rarityImageMap.epic,
+  '1000 포인트': rarityImageMap.rare,
+  '100 포인트': rarityImageMap.common,
+  '꽝': rarityImageMap.common,
+};
 
 const sortedBoardCells = computed(() => {
   if (!boardCells.value || !boardCells.value.length) return [];
@@ -349,6 +381,9 @@ onMounted(() => {
   if (memberId.value) {
     initializeGacha();
   }
+
+  // 실시간 업데이트를 위한 WebSocket 연결 시작
+  connectWebSocket();
 });
 
 watch(memberId, (value, oldValue) => {
@@ -487,13 +522,18 @@ function normalizePrize(prize) {
   }
 
   const rarity = (payload?.rarity || rankToRarity(prize.rank)).toLowerCase();
+  const description =
+    payload?.description || payload?.desc || payload?.message || payload?.text || '';
+  const imageUrl = payload?.imageUrl || payload?.image || payload?.iconUrl || payload?.icon;
+  const type = (payload?.type || prize.prizeType || 'item').toLowerCase();
 
   return {
     id: prize.id,
     name: prize.name,
-    type: (payload?.type || prize.prizeType || 'item').toLowerCase(),
-    description: payload?.description || payload?.desc || '',
-    payload,
+    type,
+    description: description || defaultPrizeDescription(type, prize.name),
+    payload: imageUrl ? { ...payload, imageUrl } : payload,
+    imageUrl,
     rarity: rarityOrder.includes(rarity) ? rarity : 'common',
     rank: prize.rank,
     quantity: prize.quantity,
@@ -505,6 +545,20 @@ function rankToRarity(rank) {
   if (rank === 2) return 'epic';
   if (rank === 3) return 'rare';
   return 'common';
+}
+
+function defaultPrizeDescription(type, name) {
+  const normalized = String(type || '').toLowerCase();
+  if (normalized === 'point') return '즉시 적립 포인트';
+  if (normalized === 'coupon') return '교환 가능한 쿠폰';
+  if (normalized === 'item') return '특별 굿즈 보상';
+  if (normalized === 'nothing' || name === '꽝') return '아쉽지만 다음 기회에!';
+  return '가챠 보상';
+}
+
+function resolveRarityFromTier(tier) {
+  const normalized = String(tier || '').trim().toLowerCase();
+  return rarityConfig[normalized]?.key || 'common';
 }
 
 function getPrizeWeight(prize) {
@@ -535,6 +589,34 @@ function hydrateHistoryFromBoard() {
 
 function findPrize(prizeId) {
   return prizePool.value.find((prize) => prize.id === prizeId) || null;
+}
+
+function buildRewardFromServer({ prizeId, prizeTier, inventoryId }) {
+  const rewardById = prizeId ? findPrize(prizeId) : null;
+  if (rewardById) {
+    return rewardById;
+  }
+
+  const tierName = typeof prizeTier === 'string' ? prizeTier.trim() : '';
+  const rewardByName = tierName ? prizePool.value.find((p) => p.name === tierName) : null;
+  if (rewardByName) {
+    return rewardByName;
+  }
+
+  return {
+    id: prizeId || inventoryId || generateFallbackId(),
+    name: tierName || '보상',
+    type: 'item',
+    description: '가챠 보상',
+    rarity: resolveRarityFromTier(tierName),
+  };
+}
+
+function generateFallbackId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `reward-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 }
 
 function pickServerPrize() {
@@ -643,25 +725,43 @@ async function handleSlotComplete(slotIndex) {
     return;
   }
 
-  const reward = pickServerPrize();
-  if (!reward) {
-    loadError.value = '추첨 가능한 경품이 없습니다.';
-    return;
-  }
-
   isDrawing.value = true;
   loadError.value = '';
 
   try {
-    await openBoardCell(targetCell.id, memberId.value, reward.id);
-    await recordGachaDrawLog(memberId.value, targetCell.id, reward.id);
+    // 백엔드의 가챠 뽑기 API 호출 (포인트 차감 + 셀 오픈 + 로그 기록 모두 처리됨)
+    const result = await drawGacha(eventInfo.value.id, memberId.value, targetCell.id);
 
+    if (!result.success) {
+      loadError.value = result.reason || '가챠 뽑기에 실패했습니다.';
+      showResult.value = false;
+      return;
+    }
+
+    // 백엔드에서 오픈한 셀 정보로 업데이트
     const openedAt = new Date().toISOString();
+    const openedCellId = result.cellId;
+    const prizeTier = result.prizeTier;
+    const prizeId = targetCell.gachaPrizeId;
+
+    // 보드 셀 상태 업데이트
     boardCells.value = boardCells.value.map((cell) =>
-      cell.id === targetCell.id
-        ? { ...cell, status: 'OPENED', gachaPrizeId: reward.id, openedAt }
+      cell.id === openedCellId
+        ? {
+            ...cell,
+            status: 'OPENED',
+            openedAt,
+            openedByMemberId: memberId.value,
+          }
         : cell,
     );
+
+    // 경품 정보 찾기
+    const reward = buildRewardFromServer({
+      prizeId,
+      prizeTier,
+      inventoryId: result.inventoryId,
+    });
 
     currentReward.value = reward;
     wonRewards.value = [...wonRewards.value, { ...reward, wonAt: openedAt }];
@@ -694,7 +794,37 @@ function getRewardEmoji(type) {
   if (type === 'coupon') return '🎟️';
   if (type === 'avatar') return '👤';
   if (type === 'title') return '🏷️';
+  if (type === 'point') return '💰';
+  if (type === 'nothing') return '⭕';
   return '🎖️';
+}
+
+function getRewardImage(reward) {
+  if (!reward) return null;
+
+  const directImage = reward.imageUrl || reward.payload?.imageUrl;
+  if (isValidAssetUrl(directImage)) {
+    return directImage;
+  }
+
+  if (rewardNameImageMap[reward.name]) {
+    return rewardNameImageMap[reward.name];
+  }
+
+  const rarityKey = reward.rarity || resolveRarityFromTier(reward.name);
+  if (rarityImageMap[rarityKey]) {
+    return rarityImageMap[rarityKey];
+  }
+
+  return DEFAULT_REWARD_IMAGE;
+}
+
+function isValidAssetUrl(value) {
+  if (!value || typeof value !== 'string') return false;
+  if (/^https?:\/\//i.test(value)) return true;
+  if (value.startsWith('data:')) return true;
+  if (value.startsWith('/')) return true;
+  return false;
 }
 
 const isBoardFullyRevealed = () => {
@@ -753,6 +883,83 @@ watch(
   { immediate: true },
 );
 
+function connectWebSocket() {
+  // WebSocket 클라이언트 생성
+  const wsEndpoint = `${WS_BASE_URL}/ws-gacha`;
+  const client = new Client({
+    webSocketFactory: () => new SockJS(wsEndpoint),
+    debug: (str) => {
+      console.log('[STOMP Debug]', str);
+    },
+    reconnectDelay: 5000,
+    heartbeatIncoming: 4000,
+    heartbeatOutgoing: 4000,
+    onConnect: () => {
+      console.log('✅ WebSocket 연결 성공!');
+
+      // /topic/gacha/updates 구독
+      subscription.value = client.subscribe('/topic/gacha/updates', (message) => {
+        console.log('📨 WebSocket 메시지 수신:', message.body);
+        try {
+          const update = JSON.parse(message.body);
+          handleGachaUpdate(update);
+        } catch (error) {
+          console.error('WebSocket 메시지 파싱 오류:', error);
+        }
+      });
+    },
+    onDisconnect: () => {
+      console.log('❌ WebSocket 연결 해제');
+    },
+    onWebSocketError: (event) => {
+      console.error('웹소켓 연결 오류 - 기본값(로컬) 또는 환경 변수 설정을 확인하세요:', event);
+    },
+    onStompError: (frame) => {
+      console.error('STOMP 오류:', frame);
+    },
+  });
+
+  stompClient.value = client;
+  client.activate();
+}
+
+function handleGachaUpdate(update) {
+  console.log('🎰 가챠 업데이트 처리:', update);
+
+  // 백엔드에서 브로드캐스트한 셀 업데이트를 반영
+  if (update.cellId && update.status) {
+    const cellIndex = boardCells.value.findIndex(cell => cell.id === update.cellId);
+    if (cellIndex !== -1) {
+      boardCells.value[cellIndex] = {
+        ...boardCells.value[cellIndex],
+        status: update.status,
+        gachaPrizeId: update.prizeId,
+        openedAt: update.openedAt || new Date().toISOString(),
+        openedByMemberId: update.memberId,
+      };
+
+      // 보드 셀 업데이트를 트리거하기 위해 배열을 새로 할당
+      boardCells.value = [...boardCells.value];
+
+      console.log(`✅ 셀 ${update.cellId} 상태 업데이트 완료`);
+    }
+  }
+}
+
+function disconnectWebSocket() {
+  if (subscription.value) {
+    subscription.value.unsubscribe();
+    subscription.value = null;
+  }
+
+  if (stompClient.value) {
+    stompClient.value.deactivate();
+    stompClient.value = null;
+  }
+
+  console.log('🔌 WebSocket 연결 종료');
+}
+
 onBeforeUnmount(() => {
   if (rewardModalListener.value) {
     window.removeEventListener('keydown', rewardModalListener.value);
@@ -763,6 +970,7 @@ onBeforeUnmount(() => {
   if (boardResetTimer.value) {
     clearTimeout(boardResetTimer.value);
   }
+  disconnectWebSocket();
 });
 </script>
 
@@ -964,6 +1172,34 @@ onBeforeUnmount(() => {
 
 .reward-modal__emoji {
   font-size: 3rem;
+}
+
+.reward-modal__image-wrapper {
+  width: 200px;
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+.reward-modal__image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 16px;
+}
+.reward-modal__image-fallback {
+  width: 100%;
+  height: 100%;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #eef2ff, #fce7f3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  color: #7c3aed;
+  border: 1px solid rgba(124, 58, 237, 0.25);
 }
 
 .reward-modal__name {
