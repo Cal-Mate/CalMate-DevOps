@@ -17,17 +17,17 @@ export default [
       {
         path: 'qna',
         name: 'dashboard-qna-list',
-        component: () => import('@/components/qna/QnaList.vue'),
+        component: () => import('@/views/qna/QnaList.vue'),
       },
       {
         path: 'qna/new',
         name: 'dashboard-qna-new',
-        component: () => import('@/components/qna/Qna.vue'),
+        component: () => import('@/views/qna/Qna.vue'),
       },
       {
         path: 'qna/:id',
         name: 'dashboard-qna-detail',
-        component: () => import('@/components/qna/QnaDetail.vue'),
+        component: () => import('@/views/qna/QnaDetail.vue'),
       },
       {
         path: 'diary',

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="cal-wrap">
     <header class="page-head">
       <h2 class="page-title">활동 캘린더</h2>
@@ -61,7 +61,7 @@
         </div>
 
         <div v-else class="detail-body">
-          <!-- 요약 박스 클릭 → 식단 페이지 -->
+          <!-- 요약 카드 클릭 시 식단 화면으로 이동 -->
           <div class="summary clickable" @click="goDiet">
             <div class="row">
               <div class="label">섭취 칼로리</div>
@@ -77,7 +77,7 @@
             </div>
           </div>
 
-          <!-- 운동 박스 클릭 → 운동 페이지 -->
+          <!-- 운동 카드 클릭 시 운동 화면으로 이동 -->
           <div class="workout" v-if="exerciseRecords.length" @click="goExercise">
             <div class="e-head">
               <span class="dot blue"></span>
@@ -128,9 +128,13 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { fetchExerciseRecords } from '@/api/exerciseRecords'
 import { getDietByType } from '@/api/diet'
-import { fetchCalendarRange } from '@/api/calendar'
-import { fetchDiariesByDay } from '@/api/diary'
 import { useUserStore } from '@/stores/user'
+import {
+  getCalendarByMonth,
+
+  getMonthlyBadgeCount
+} from '@/api/calendar'
+import { getDiaryByDate, toDiaryClientMood } from '@/api/diary'
 
 const MEAL_TYPES = ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK']
 
@@ -140,41 +144,18 @@ function toKey(y, m, d) {
   return `${y}-${mm}-${dd}`
 }
 
-function toDateKeyFromValue(value) {
-  if (!value) return null
-  if (typeof value === 'string') {
-    return value.split('T')[0]
-  }
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toISOString().split('T')[0]
-  }
-  if (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof value.year === 'number' &&
-    typeof value.monthValue === 'number' &&
-    typeof value.dayOfMonth === 'number'
-  ) {
-    const mm = String(value.monthValue).padStart(2, '0')
-    const dd = String(value.dayOfMonth).padStart(2, '0')
-    return `${value.year}-${mm}-${dd}`
-  }
-  try {
-    const parsed = new Date(value)
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toISOString().split('T')[0]
-    }
-  } catch {
-    return null
-  }
-  return null
-}
-
 const router = useRouter()
 const userStore = useUserStore()
 const currentDate = ref(new Date())
 const selectedDate = ref(null)
 const memberId = computed(() => userStore.userId)
+
+const calendarByDate = ref({})
+const dietTotalsByDate = ref({})
+const exerciseByDate = ref({})
+const diaryDetailByDate = ref({})
+const monthBadgeCountServer = ref(0)
+const showBadgePopover = ref(false)
 
 const dayNames = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -196,60 +177,46 @@ const selectedLabel = computed(() => {
   })
 })
 
-const dietTotalsByDate = ref({})
-const exerciseByDate = ref({})
-const calendarByDate = ref({})
-const selectedDiaryEntry = ref(null)
-
-async function loadCalendarRange() {
-  if (!memberId.value) {
-    calendarByDate.value = {}
-    return
-  }
-  const { year, month, daysInMonth } = monthMeta.value
-  const monthStr = String(month + 1).padStart(2, '0')
-  const startDate = `${year}-${monthStr}-01`
-  const endDate = `${year}-${monthStr}-${String(daysInMonth).padStart(2, '0')}`
-
-  try {
-    const records = await fetchCalendarRange({
-      memberId: memberId.value,
-      startDate,
-      endDate
-    })
-
-    const map = {}
-    records.forEach((item) => {
-      const key = toDateKeyFromValue(item?.calDay)
-      if (!key) return
-      const exercise = Number(item?.exerciseStatus ?? 0) === 1
-      const diet = Number(item?.mealStatus ?? 0) === 1
-      const diary = Number(item?.diaryStatus ?? 0) === 1
-      map[key] = {
-        exercise,
-        diet,
-        diary,
-        allDone: exercise && diet && diary
-      }
-    })
-    calendarByDate.value = map
-  } catch (error) {
-    console.error('calendar loadCalendarRange error', error)
-    calendarByDate.value = {}
-  }
-}
-
 watch(
-  [() => monthMeta.value.year, () => monthMeta.value.month, () => memberId.value],
+  () => [memberId.value, monthMeta.value.year, monthMeta.value.month],
   () => {
-    if (!memberId.value) {
-      calendarByDate.value = {}
-      return
-    }
-    loadCalendarRange()
+    fetchCalendarMonth()
   },
   { immediate: true }
 )
+
+async function fetchCalendarMonth() {
+  if (!memberId.value) {
+    calendarByDate.value = {}
+    monthBadgeCountServer.value = 0
+    return
+  }
+  const { year, month } = monthMeta.value
+  try {
+    const { data } = await getCalendarByMonth({
+      memberId: memberId.value,
+      year,
+      month: month + 1
+    })
+    const map = {}
+    data?.forEach((item) => {
+      if (!item?.calDay) return
+      const key = item.calDay.split('T')[0]
+      map[key] = item
+    })
+    calendarByDate.value = map
+    const { data: badgeData } = await getMonthlyBadgeCount({
+      memberId: memberId.value,
+      year,
+      month: month + 1
+    })
+    monthBadgeCountServer.value = badgeData?.badgeCount ?? 0
+  } catch (error) {
+    console.error('fetchCalendarMonth error', error)
+    calendarByDate.value = {}
+    monthBadgeCountServer.value = 0
+  }
+}
 
 const calendarCells = computed(() => {
   const { daysInMonth, startingDayOfWeek, year, month } = monthMeta.value
@@ -272,10 +239,11 @@ const calendarCells = computed(() => {
       selectedDate.value.getMonth() === month &&
       selectedDate.value.getFullYear() === year
     const key = toKey(year, month, day)
-    const status = calendarByDate.value[key] || {}
-    const hasDiary = Boolean(status.diary)
-    const hasDiet = Boolean(status.diet)
-    const hasExercise = Boolean(status.exercise)
+    const record = calendarByDate.value[key]
+    const diaryDone = record ? record.diaryStatus === 1 : false
+    const dietDone = record ? record.mealStatus === 1 : false
+    const exerciseDone = record ? record.exerciseStatus === 1 : false
+
     cells.push({
       key: `${year}-${month + 1}-${day}`,
       isPlaceholder: false,
@@ -283,10 +251,10 @@ const calendarCells = computed(() => {
       isToday,
       isSelected,
       flags: {
-        diary: hasDiary,
-        diet: hasDiet,
-        exercise: hasExercise,
-        allDone: status.allDone ?? (hasDiary && hasDiet && hasExercise)
+        diary: diaryDone,
+        diet: dietDone,
+        exercise: exerciseDone,
+        allDone: record?.badgeCount ? record.badgeCount > 0 : diaryDone && dietDone && exerciseDone
       }
     })
   }
@@ -298,12 +266,16 @@ const badgeDays = computed(() => {
   const res = []
   for (let d = 1; d <= daysInMonth; d++) {
     const key = toKey(year, month, d)
-    if (calendarByDate.value[key]?.allDone) res.push(d)
+    const record = calendarByDate.value[key]
+    if (record?.diaryStatus === 1 && record?.mealStatus === 1 && record?.exerciseStatus === 1) {
+      res.push(d)
+    }
   }
   return res
 })
-const monthBadgeCount = computed(() => badgeDays.value.length)
-const showBadgePopover = ref(false)
+
+const monthBadgeCount = computed(() => monthBadgeCountServer.value || badgeDays.value.length)
+
 function toggleBadgePopover() {
   showBadgePopover.value = !showBadgePopover.value
 }
@@ -322,74 +294,89 @@ async function selectDate(day) {
   const { year, month } = monthMeta.value
   const dateObj = new Date(year, month, day)
   selectedDate.value = dateObj
-  selectedDiaryEntry.value = null
   if (!memberId.value) return
   const dateKey = toKey(year, month, day)
+  await Promise.all([
+    fetchDietTotals(dateKey),
+    fetchExerciseTotals(dateKey),
+    fetchDiaryDetail(dateKey)
+  ])
+}
 
+async function fetchDietTotals(dateKey) {
   try {
-    const dietPromise = Promise.all(
-      MEAL_TYPES.map(type =>
-        getDietByType({ date: dateKey, type, memberId: memberId.value })
-      )
+    const responses = await Promise.all(
+      MEAL_TYPES.map((type) => getDietByType({ date: dateKey, type, memberId: memberId.value }))
     )
-    const exercisePromise = fetchExerciseRecords({
-      memberId: memberId.value,
-      date: dateKey
-    })
-    const diaryPromise = fetchDiariesByDay({
-      memberId: memberId.value,
-      day: dateKey
-    })
-
-    const [dietResponses, exerciseResponse, diaryList] = await Promise.all([
-      dietPromise,
-      exercisePromise,
-      diaryPromise
-    ])
-    const dietList = dietResponses.flatMap(res => res.data || [])
+    const dietList = responses.flatMap((res) => res.data || [])
     const intakeKcal = dietList.reduce((sum, item) => {
-      const kcalFromFood =
-        item?.food && item.food.kcal != null ? Number(item.food.kcal) : 0
-      const kcalDirect =
-        item?.kcal != null ? Number(item.kcal) : 0
-      const kcal = !isNaN(kcalFromFood) && kcalFromFood > 0 ? kcalFromFood : kcalDirect
-      return sum + (isNaN(kcal) ? 0 : kcal)
+      const kcalFromFood = item?.food && item.food.kcal != null ? Number(item.food.kcal) : 0
+      const kcalDirect = item?.kcal != null ? Number(item.kcal) : 0
+      const kcal = !Number.isNaN(kcalFromFood) && kcalFromFood > 0 ? kcalFromFood : kcalDirect
+      return sum + (Number.isNaN(kcal) ? 0 : kcal)
     }, 0)
-
     dietTotalsByDate.value = {
       ...dietTotalsByDate.value,
       [dateKey]: { totalKcal: intakeKcal }
     }
+  } catch (error) {
+    console.error('fetchDietTotals error', error)
+    dietTotalsByDate.value = {
+      ...dietTotalsByDate.value,
+      [dateKey]: { totalKcal: 0 }
+    }
+  }
+}
 
-    const exerciseListRaw = Array.isArray(exerciseResponse?.data) ? exerciseResponse.data : []
-    const normalizedExerciseList = exerciseListRaw.map(r => ({
-      ...r,
-      minutes: r.min,
-      kcal: r.burnedKcal
-    }))
-    const burnKcal = normalizedExerciseList.reduce((sum, item) => {
+async function fetchExerciseTotals(dateKey) {
+  try {
+    const { data: exerciseList = [] } = await fetchExerciseRecords({
+      memberId: memberId.value,
+      date: dateKey
+    })
+    const normalized = Array.isArray(exerciseList)
+      ? exerciseList.map((r) => ({
+          ...r,
+          minutes: r.min,
+          kcal: r.burnedKcal
+        }))
+      : []
+    const burnKcal = normalized.reduce((sum, item) => {
       const v = Number(item.kcal ?? 0)
-      return sum + (isNaN(v) ? 0 : v)
+      return sum + (Number.isNaN(v) ? 0 : v)
     }, 0)
     exerciseByDate.value = {
       ...exerciseByDate.value,
       [dateKey]: {
         burnKcal,
-        records: normalizedExerciseList
+        records: normalized
       }
     }
-    selectedDiaryEntry.value = Array.isArray(diaryList) && diaryList.length ? diaryList[0] : null
-  } catch (e) {
-    console.error('calendar selectDate error', e)
-    dietTotalsByDate.value = {
-      ...dietTotalsByDate.value,
-      [dateKey]: { totalKcal: 0 }
-    }
+  } catch (error) {
+    console.error('fetchExerciseTotals error', error)
     exerciseByDate.value = {
       ...exerciseByDate.value,
       [dateKey]: { burnKcal: 0, records: [] }
     }
-    selectedDiaryEntry.value = null
+  }
+}
+
+async function fetchDiaryDetail(dateKey) {
+  try {
+    const { data } = await getDiaryByDate({ memberId: memberId.value, date: dateKey })
+    const diary = Array.isArray(data) && data.length ? data[0] : null
+    diaryDetailByDate.value = {
+      ...diaryDetailByDate.value,
+      [dateKey]: diary
+    }
+    return diary
+  } catch (error) {
+    console.error('fetchDiaryDetail error', error)
+    diaryDetailByDate.value = {
+      ...diaryDetailByDate.value,
+      [dateKey]: null
+    }
+    return null
   }
 }
 
@@ -413,40 +400,31 @@ function dayColor(index) {
 
 const summary = computed(() => {
   if (!selectedDate.value) return { intakeKcal: 0, burnKcal: 0, netKcal: 0 }
-  const key = toKey(
-    selectedDate.value.getFullYear(),
-    selectedDate.value.getMonth(),
-    selectedDate.value.getDate()
-  )
+  const key = getSelectedDateKey()
   const intakeKcal = Number(dietTotalsByDate.value[key]?.totalKcal || 0)
   const burnKcal = Number(exerciseByDate.value[key]?.burnKcal || 0)
   return { intakeKcal, burnKcal, netKcal: intakeKcal - burnKcal }
 })
 
 const journalEntry = computed(() => {
-  if (!selectedDate.value || !selectedDiaryEntry.value) return null
-  const entry = selectedDiaryEntry.value
-  const moodMap = {
+  if (!selectedDate.value) return null
+  const key = getSelectedDateKey()
+  const entry = diaryDetailByDate.value[key]
+  if (!entry) return null
+  const moodKey = entry.mood ? toDiaryClientMood(entry.mood) : null
+  const moodLabelMap = {
     great: '아주 좋음',
     good: '좋음',
-    normal: '보통',
+    okay: '보통',
     bad: '나쁨',
     terrible: '아주 나쁨'
   }
-  return {
-    ...entry,
-    notes: entry.memo,
-    moodLabel: moodMap[entry.mood] || entry.mood
-  }
+  return { ...entry, moodLabel: moodLabelMap[moodKey] || entry.mood }
 })
 
 const exerciseRecords = computed(() => {
   if (!selectedDate.value) return []
-  const key = toKey(
-    selectedDate.value.getFullYear(),
-    selectedDate.value.getMonth(),
-    selectedDate.value.getDate()
-  )
+  const key = getSelectedDateKey()
   const rec = exerciseByDate.value[key]?.records || []
   return Array.isArray(rec) ? rec : []
 })
@@ -464,7 +442,7 @@ function goDiet() {
   const key = getSelectedDateKey()
   if (!key) return
   router.push({
-    path: '/main/dietmanagement', 
+    path: '/main/dietmanagement',
     query: { date: key }
   })
 }
@@ -473,14 +451,14 @@ function goExercise() {
   const key = getSelectedDateKey()
   if (!key) return
   router.push({
-    path: '/main/exerciseRecords', 
+    path: '/main/exerciseRecords',
     query: { date: key }
   })
 }
 
 function openDiary() {
-  if (!selectedDate.value) return
   const key = getSelectedDateKey()
+  if (!key) return
   router.push({ name: 'main-diary-done', query: { date: key } })
 }
 </script>
@@ -579,4 +557,5 @@ function openDiary() {
 }
 </style>
 
-\n.month-badges { margin-left: auto; font-weight: 800; color: #111827; background: #fff7ed; border: 1px solid #fdebd3; padding: 6px 10px; border-radius: 999px; display: flex; align-items: center; gap: 6px; }\n.month-badges .count { color: #c2410c; }\n
+.month-badges { margin-left: auto; font-weight: 800; color: #111827; background: #fff7ed; border: 1px solid #fdebd3; padding: 6px 10px; border-radius: 999px; display: flex; align-items: center; gap: 6px; }
+.month-badges .count { color: #c2410c; }

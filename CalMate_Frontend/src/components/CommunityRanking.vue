@@ -4,7 +4,7 @@
     <p class="sub">좋아요 순위 Top 20</p>
 
     <ul class="rank-list">
-      <li v-for="(item, index) in rankData" :key="index">
+      <li v-for="(item, index) in communityStore.ranking" :key="index">
         <span class="rank-num">{{ index + 1 }}</span>
         <span class="name">{{ item.nickname }}</span>
         <span class="like">❤️ {{ item.totalLikes }}</span>
@@ -14,21 +14,20 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue"
-import { fetchCommunityRanking } from "@/api/post"
+import { onMounted, watch } from "vue"
+import { useCommunityStore } from "@/stores/community"
 
-const rankData = ref([])
+const communityStore = useCommunityStore()
 
-const loadRank = async () => {
-  try {
-    const { data } = await fetchCommunityRanking()
-    rankData.value = data
-  } catch (e) {
-    console.error("랭킹 조회 오류:", e)
-  }
-}
+// ✅ 최초 로드 시 랭킹 조회
+onMounted(() => {
+  communityStore.loadRanking()
+})
 
-onMounted(loadRank)
+// ✅ 좋아요 변경 시 자동 새로고침
+watch(() => communityStore.refreshTrigger, () => {
+  communityStore.loadRanking()
+})
 </script>
 
 <style scoped>
@@ -56,10 +55,12 @@ onMounted(loadRank)
   width: 24px;
   font-weight: 600;
 }
+
 .name {
   flex: 1;
   margin-left: 8px;
 }
+
 .like {
   color: #ff4d6d;
   font-weight: 600;

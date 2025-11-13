@@ -94,13 +94,13 @@
           </div>
         </div>
 
-        <div v-if="photos.length" class="d-thumbs">
+        <div v-if="photoItems.length" class="d-thumbs">
           <div
-            v-for="(p, i) in photos"
-            :key="`${p}-${i}`"
+            v-for="(p, i) in photoItems"
+            :key="p.id ? `existing-${p.id}` : `new-${i}`"
             class="d-thumb"
           >
-            <img :src="p" :alt="`일기 사진 ${i + 1}`" />
+            <img :src="p.src" :alt="`일기 사진 ${i + 1}`" />
             <button
               class="d-thumb-del"
               type="button"
@@ -133,7 +133,7 @@
 
       <div class="today-body">
         <div class="today-date">
-          {{ formatDate(todayEntry.date) }}
+          {{ formatDate(todayEntry.day || todayKey) }}
         </div>
 
         <div class="today-row">
@@ -164,25 +164,25 @@
         </div>
 
         <div
-          v-if="todayEntry.notes"
+          v-if="todayEntry.memo"
           class="today-row"
         >
           <span class="today-label">메모</span>
           <span class="today-value multiline">
-            {{ todayEntry.notes }}
+            {{ todayEntry.memo }}
           </span>
         </div>
 
         <div
-          v-if="todayEntry.photos && todayEntry.photos.length"
+          v-if="todayEntry.files && todayEntry.files.length"
           class="today-row today-photos"
         >
           <span class="today-label">사진</span>
           <div class="today-photo-list">
             <img
-              v-for="(p, i) in todayEntry.photos"
-              :key="`${p}-${i}`"
-              :src="p"
+              v-for="(p, i) in todayEntry.files"
+              :key="p.id ? `existing-${p.id}` : `new-${i}`"
+              :src="resolveFileUrl(p.path)"
               :alt="`오늘 일기 사진 ${i + 1}`"
             />
           </div>
@@ -193,85 +193,135 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useRoute } from 'vue-router'
+import { ref, computed, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useToast } from '../../lib/toast.js'
+import { useUserStore } from '@/stores/user'
+import {
+  createDiary,
+  updateDiary,
+  getDiaryByDate,
+  toDiaryClientMood
+} from '@/api/diary'
+import {
+  createCalendarEntry,
+  getCalendarByDay,
+  updateCalendar
+} from '@/api/calendar'
 
-const { success } = useToast()
 const router = useRouter()
-
 const route = useRoute()
-const todayKey = (() => {
-  const q = route?.query?.date
-  if (typeof q === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(q)) return q
-  return new Date().toISOString().split('T')[0]
-})()
-
-const todayLabel = computed(() =>
-  new Date(todayKey).toLocaleDateString('ko-KR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  }),
-)
-
-const entries = ref([])
+const userStore = useUserStore()
+const { success, error: toastError } = useToast()
 
 const weight = ref('')
 const mood = ref('good')
 const condition = ref('')
 const notes = ref('')
-const photos = ref([])
+const photoItems = ref([])
+const deleteFileIds = ref([])
 const photoUrl = ref('')
 const fileInputRef = ref(null)
+const currentDiary = ref(null)
+const isLoading = ref(false)
+const isSaving = ref(false)
 
-const moodOptions = [
-  { value: 'great', label: '아주 좋음', icon: '😊' },
-  { value: 'good', label: '좋음', icon: '🙂' },
-  { value: 'okay', label: '보통', icon: '😐' },
-  { value: 'bad', label: '나쁨', icon: '🙁' },
-  { value: 'terrible', label: '최악', icon: '😭' },
-]
+const memberId = computed(() => userStore.userId || null)
 
-// 오늘 일기 computed
-const todayEntry = computed(() =>
-  entries.value.find((e) => e.date === todayKey) || null,
+const todayKey = computed(() => {
+  const q = route?.query?.date
+  if (typeof q === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(q)) return q
+  return new Date().toISOString().split('T')[0]
+})
+
+const todayLabel = computed(() =>
+  new Date(todayKey.value).toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  })
 )
 
-// 오늘 기분 표시용
+const moodOptions = [
+  { value: 'great',    label: '아주 좋음', icon: '😄' },
+  { value: 'good',     label: '좋음',      icon: '🙂' },
+  { value: 'okay',     label: '보통',      icon: '😐' },
+  { value: 'bad',      label: '나쁨',      icon: '🙁' },
+  { value: 'terrible', label: '아주 나쁨', icon: '😣' }
+]
+
+const todayEntry = computed(() => currentDiary.value)
+
 const todayMood = computed(() => {
   const target = todayEntry.value
-    ? moodOptions.find((m) => m.value === todayEntry.value.mood)
+    ? moodOptions.find((m) => m.value === toDiaryClientMood(todayEntry.value.mood))
     : moodOptions.find((m) => m.value === mood.value)
-  return (
-    target || { label: '기록 없음', icon: '📝' }
-  )
+  return target || { label: '기록 없음', icon: '📝' }
 })
 
-onMounted(() => {
-  const raw = localStorage.getItem('journalEntries')
-  if (!raw) return
-  try {
-    const parsed = JSON.parse(raw)
-    if (Array.isArray(parsed)) {
-      entries.value = parsed
-      const today = parsed.find((e) => e.date === todayKey)
-      if (today) {
-        weight.value =
-          today.weight !== undefined
-            ? String(today.weight)
-            : ''
-        mood.value = today.mood ?? 'good'
-        condition.value = today.condition ?? ''
-        notes.value = today.notes ?? ''
-        photos.value = today.photos ?? []
-      }
-    }
-  } catch {
-    // 파싱 실패 시 무시
+watch(
+  () => [todayKey.value, memberId.value],
+  () => {
+    loadDiary()
+  },
+  { immediate: true }
+)
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081'
+
+function resolveFileUrl(path) {
+  if (!path) return ''
+  if (/^https?:/i.test(path)) return path
+  return `${API_BASE_URL}${path}`
+}
+
+async function loadDiary() {
+  if (!memberId.value) {
+    resetForm()
+    return
   }
-})
+  isLoading.value = true
+  try {
+    const { data } = await getDiaryByDate({
+      memberId: memberId.value,
+      date: todayKey.value
+    })
+    const diary = Array.isArray(data) && data.length > 0 ? data[0] : null
+    currentDiary.value = diary
+    if (diary) {
+      weight.value = diary.weight != null ? String(diary.weight) : ''
+      mood.value = toDiaryClientMood(diary.mood)
+      condition.value = diary.condition ?? ''
+      notes.value = diary.memo ?? ''
+      photoItems.value = Array.isArray(diary.files)
+        ? diary.files.map((file) => ({
+            id: file.id,
+            type: 'existing',
+            src: resolveFileUrl(file.path)
+          }))
+        : []
+    } else {
+      resetForm()
+    }
+    deleteFileIds.value = []
+  } catch (error) {
+    console.error('loadDiary error', error)
+    toastError('일기 데이터를 가져오는 데 실패했습니다.')
+    resetForm()
+  } finally {
+    isLoading.value = false
+  }
+}
+
+function resetForm() {
+  weight.value = ''
+  mood.value = 'good'
+  condition.value = ''
+  notes.value = ''
+  photoItems.value = []
+  deleteFileIds.value = []
+  currentDiary.value = null
+}
 
 function triggerFileInput() {
   fileInputRef.value?.click()
@@ -283,7 +333,10 @@ function handleImageUpload(e) {
   const reader = new FileReader()
   reader.onloadend = () => {
     if (reader.result) {
-      photos.value = [...photos.value, reader.result]
+      photoItems.value = [
+        ...photoItems.value,
+        { type: 'new', file, src: reader.result }
+      ]
     }
   }
   reader.readAsDataURL(file)
@@ -291,59 +344,93 @@ function handleImageUpload(e) {
 }
 
 function handleAddPhotoUrl() {
-  const url = photoUrl.value.trim()
-  if (!url) return
-  photos.value = [...photos.value, url]
+  if (!photoUrl.value.trim()) return
+  toastError('이미지 URL 업로드는 현재 지원하지 않습니다. 파일로 업로드해 주세요.')
   photoUrl.value = ''
 }
 
-function handleRemovePhoto(i) {
-  photos.value = photos.value.filter(
-    (_, idx) => idx !== i,
-  )
-}
-
-function handleSave() {
-  const entry = {
-    id: todayKey,
-    date: todayKey,
-    weight: weight.value
-      ? parseFloat(weight.value)
-      : undefined,
-    mood: mood.value,
-    condition: condition.value,
-    notes: notes.value,
-    photos: photos.value.length
-      ? photos.value
-      : undefined,
+function handleRemovePhoto(index) {
+  const target = photoItems.value[index]
+  if (!target) return
+  if (target.type === 'existing' && target.id) {
+    deleteFileIds.value = [...new Set([...deleteFileIds.value, target.id])]
   }
-
-  const filtered = entries.value.filter(
-    (e) => e.date !== todayKey,
-  )
-  const updated = [entry, ...filtered].sort(
-    (a, b) =>
-      new Date(b.date) - new Date(a.date),
-  )
-
-  entries.value = updated
-  localStorage.setItem(
-    'journalEntries',
-    JSON.stringify(updated),
-  )
-
-  success('일기가 저장되었습니다!')
-  router.push({ name: 'main-diary-done', query: { date: todayKey } })
+  photoItems.value = photoItems.value.filter((_, i) => i !== index)
 }
 
-// 날짜 출력용
+async function handleSave() {
+  if (!memberId.value) {
+    toastError('로그인 후 이용해 주세요.')
+    return
+  }
+  isSaving.value = true
+  try {
+    const filesToUpload = photoItems.value
+      .filter((item) => item.type === 'new' && item.file instanceof File)
+      .map((item) => item.file)
+
+    if (!currentDiary.value) {
+      await createDiary({
+        memberId: memberId.value,
+        date: todayKey.value,
+        mood: mood.value,
+        weight: weight.value,
+        condition: condition.value,
+        memo: notes.value,
+        files: filesToUpload
+      })
+    } else {
+      await updateDiary({
+        id: currentDiary.value.id,
+        mood: mood.value,
+        weight: weight.value,
+        condition: condition.value,
+        memo: notes.value,
+        files: filesToUpload.length > 0 ? filesToUpload : [],
+        deleteFileIds: deleteFileIds.value.length > 0 ? deleteFileIds.value : undefined
+      })
+    }
+
+    await syncCalendarDiaryStatus(true)
+    success('일기가 저장되었습니다!')
+    await loadDiary()
+    router.push({ name: 'main-diary-done', query: { date: todayKey.value } })
+  } catch (error) {
+    console.error('handleSave error', error)
+    toastError('일기를 저장하는 중 오류가 발생했습니다.')
+  } finally {
+    isSaving.value = false
+  }
+}
+
+async function syncCalendarDiaryStatus(hasDiary) {
+  if (!memberId.value) return
+  try {
+    const { data } = await getCalendarByDay({
+      memberId: memberId.value,
+      day: todayKey.value
+    })
+    if (data && data.id) {
+      await updateCalendar({ id: data.id, diaryStatus: hasDiary ? 1 : 0 })
+    } else if (hasDiary) {
+      await createCalendarEntry({
+        memberId: memberId.value,
+        calDay: `${todayKey.value}T00:00:00`,
+        diaryStatus: 1
+      })
+    }
+  } catch (error) {
+    console.error('calendar sync error', error)
+  }
+}
+
 function formatDate(dateStr) {
   try {
     const d = new Date(dateStr)
     return d.toLocaleDateString('ko-KR', {
       year: 'numeric',
       month: 'long',
-      day: 'numeric',
+      day: 'numeric'
     })
   } catch {
     return dateStr
@@ -409,8 +496,7 @@ function formatDate(dateStr) {
 .d-input:focus {
   outline: none;
   border-color: #3b82f6;
-  box-shadow: 0 0 0 3px
-    rgba(59, 130, 246, 0.18);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
   background: #fff;
 }
 .d-textarea {
@@ -427,8 +513,7 @@ function formatDate(dateStr) {
 .d-textarea:focus {
   outline: none;
   border-color: #3b82f6;
-  box-shadow: 0 0 0 3px
-    rgba(59, 130, 246, 0.18);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
   background: #fff;
 }
 
@@ -454,9 +539,7 @@ function formatDate(dateStr) {
 }
 .d-mood.is-active {
   border-color: #2563eb;
-  box-shadow: 0 0 0 2px
-      rgba(37, 99, 235, 0.25)
-    inset;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25) inset;
   background: #eff6ff;
 }
 .d-mood-emoji {
