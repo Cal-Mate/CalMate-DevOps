@@ -82,8 +82,8 @@ import { generateDeviceFp } from '@/lib/deviceFp';
 
 const userStore = useUserStore();
 const router = useRouter();
-const email = ref('jangyoungsil@gmail.com');
-const pwd = ref('pw1234!');
+const email = ref('');
+const pwd = ref('');
 
 
     const modal = reactive({
