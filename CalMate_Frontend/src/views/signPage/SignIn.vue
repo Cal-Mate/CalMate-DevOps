@@ -75,9 +75,9 @@ async function signIn() {
 
 
     // 로그인 할때 고유 아이디 세션 스토리지에 저장
-    let deviceFp = localStorage.getItem('device_fp');
+    let deviceFp = sessionStorage.getItem('device_fp');
     if (!deviceFp) {
-      deviceFp = crypto.randomUUID();
+      deviceFp = generateDeviceFp();
       sessionStorage.setItem('device_fp', deviceFp);
     }
 
