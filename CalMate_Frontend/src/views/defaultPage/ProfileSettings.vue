@@ -92,7 +92,6 @@
         <div class="field">
             <label class="label">성별</label>
             <input disabled class="input" type="text"  v-model="form.gender" @blur="v('gender')" />
-            <p class="msg"><span class="error" v-if="errors.gender">{{ errors.gender }}</span></p>
         </div>
         <!-- 키 -->
         <div class="field">
@@ -123,6 +122,7 @@
           <div class="input with-icon">
             <span class="ico">📅</span>
             <input class="plain" type="date" v-model="form.endDate" @blur="v('birth')" />
+            <p class="msg"><span class="error" v-if="errors.endDate">{{ errors.endDate }}</span></p>
           </div>
           <p class="msg"></p>
         </div>
@@ -130,8 +130,8 @@
         <!-- 목표 체중 -->
         <div class="field">
           <label class="label">목표 체중 (kg)</label>
-          <input class="input" type="number" placeholder="75" v-model.number="form.targetValue" @blur="v('weight')" min="20" max="400" step="0.1" />
-          <p class="msg"><span class="error" v-if="errors.weight">{{ errors.weight }}</span></p>
+          <input class="input" type="number" placeholder="75" v-model.number="form.targetValue" @blur="v('targetValue')" min="20" max="400" step="0.1" />
+          <p class="msg"><span class="error" v-if="errors.targetValue">{{ errors.targetValue }}</span></p>
         </div>
 
         <!-- 목표 -->
@@ -153,6 +153,7 @@
           <label class="label">현재 목표</label>
           <div class="input muted">
             <span class="muted-text">{{ goalLabel }}</span>
+            <p class="msg"><span class="error" v-if="!goalLabel">{{ errors.goalLabel }}</span></p>
           </div>
           <p class="msg"></p>
         </div>
@@ -250,7 +251,7 @@ const form = reactive({
   birth: userStore.birth,
   height: userStore.height,
   weight: userStore.weight,
-  activity: 1.55,
+  email: userStore.email,
   goal: 'lose',
   bmr: null,
   point : 0,
@@ -261,19 +262,11 @@ const form = reactive({
 
 })
 
-// form.name = userStore.name;
-// form.nickname = userStore.nickname;
-// form.phone = userStore.phone;
-// form.birth = userStore.birth;
-// form.gender = userStore.gender;
-// form.height = userStore.height;
-// form.weight = userStore.weight;
-// form.bmr = userStore.bodyMetric;
 
 /* ------------- 에러(고정 높이 영역에 표시) ------------- */
 const errors = reactive({
-  nickname: '', phone: '',nickname: '',
-  height: '', weight: '', activity: '', bmr: ''
+  nickname: '', phone: '', targetValue, endDate,
+  height: '', weight: '',  bmr: '', goalLabel
 })
 
 /* ------------- 아바타 업로드 ------------- */
@@ -289,7 +282,7 @@ async function onSelectAvatar(e){
 
   if (!file) return
   if (!file.type.startsWith('image/')) return alert('이미지 파일만 업로드 가능해요.')
-  if (file.size > 5 * 1024 * 1024) return alert('5MB 이하만 업로드 가능합니다.')
+  // if (file.size > 5 * 1024 * 1024) return alert('5MB 이하만 업로드 가능합니다.')
 
   try {
     // uploading.value = true
@@ -339,13 +332,13 @@ const rules = {
   height(v){ if(v===null||v===undefined||v==='') return '키를 입력하세요.'; const n=+v; return (n<50||n>250)?'키는 50~250cm':'';
   },
   weight(v){ if(v===null||v===undefined||v==='') return '체중을 입력하세요.'; const n=+v; return (n<20||n>400)?'체중은 20~400kg':'' },
-  activity(v){ return v? '':'' },
+  endOfGoal(v){ return v? '':'' },
   bmr(v){ if(v===null||v===undefined||v==='') return ''; const n=+v; if(!Number.isFinite(n)) return '숫자만 입력'; return (n<500||n>5000)?'BMR은 500~5000kcal':'' }
 }
 function v(key){ if(rules[key]) errors[key]=rules[key](form[key]) }
 
 /* ------------- 파생 값 ------------- */
-const goalLabel = computed(()=> form.goal==='lose'?'체중 감량': form.goal==='gain'?'체중 증량':'체중 유지')
+const goalLabel = computed(()=> form.goal==='LOSS'?'체중 감량': form.goal==='INCREASE'?'체중 증량':'체중 유지')
 const exampleBmr = computed(()=>{
   const sexAdj = form.gender==='male'? 5 : -161
   const age = calcAge(form.birth)

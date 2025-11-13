@@ -44,8 +44,9 @@ import BingoVerificationModal from './BingoVerificationModal.vue';
 import { POINTS_RULES } from '../lib/pointsSystem.js';
 import { useToast } from '../lib/toast.js';
 import { getCurrentYearMonthInKst } from '@/utils/date.js';
+import { API_BASE_URL } from '@/lib/api';
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081').replace(/\/$/, '');
+// const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081').replace(/\/$/, '');
 const DEFAULT_EXTEND_FILE_PATH_ID = Number(import.meta.env.VITE_BINGO_EXTEND_FILE_PATH_ID ?? '') || null;
 
 export default defineComponent({

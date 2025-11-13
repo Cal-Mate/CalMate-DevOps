@@ -91,8 +91,20 @@
       <header class="card__header">
         <h2 class="card__title">오늘의 활동</h2>
       </header>
-      <ProgressBar label="식사 기록" :value="todayMealCount" :max="3" unit="회" :long="true" />
-      <ProgressBar label="운동 시간" :value="todayExerciseMinutes" :max="60" unit="분" :long="true" />
+      <ProgressBar
+        label="식사 기록"
+        :value="todayMealCount"
+        :max="3"
+        unit="회"
+        :long="true"
+      />
+      <ProgressBar
+        label="운동 시간"
+        :value="todayExerciseMinutes"
+        :max="60"
+        unit="분"
+        :long="true"
+      />
     </section>
 
     <!-- 식사 추천 -->
@@ -145,7 +157,13 @@ import { getDietByType } from '@/api/diet'
 const userStore = useUserStore()
 
 const MEAL_TYPES = ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK']
-const todayStr = new Date().toISOString().slice(0, 10)
+
+// ✅ 로컬 시간 기준 오늘 날짜 (UTC 안 씀)
+const today = new Date()
+const year = today.getFullYear()
+const month = String(today.getMonth() + 1).padStart(2, '0')
+const day = String(today.getDate()).padStart(2, '0')
+const todayStr = `${year}-${month}-${day}`
 
 const todayIntakeKcal = ref(0)
 const todayBurnKcal = ref(0)
@@ -173,6 +191,7 @@ const loadTodayStats = async () => {
         })
       )
     )
+
     const dietList = dietResponses.flatMap((r) => r.data || [])
 
     const intake = dietList.reduce((sum, item) => {
@@ -207,7 +226,10 @@ const loadTodayStats = async () => {
     const burn = list.reduce((sum, r) => sum + (Number(r.burnedKcal) || 0), 0)
     todayBurnKcal.value = burn
 
-    const minutes = list.reduce((sum, r) => sum + (Number(r.min ?? r.minutes) || 0), 0)
+    const minutes = list.reduce(
+      (sum, r) => sum + (Number(r.min ?? r.minutes) || 0),
+      0
+    )
     todayExerciseMinutes.value = minutes
   } catch (e) {
     console.error('대시보드 오늘 통계 조회 실패', e)
