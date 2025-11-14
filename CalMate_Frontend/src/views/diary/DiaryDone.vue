@@ -71,6 +71,7 @@ import { useToast } from '../../lib/toast.js'
 import { useUserStore } from '@/stores/user'
 import { getDiaryByDate, deleteDiary, toDiaryClientMood } from '@/api/diary'
 import { getCalendarByDay, updateCalendar } from '@/api/calendar'
+import api from '@/lib/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -121,11 +122,13 @@ watch(
   { immediate: true }
 )
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081'
+
 const resolveFileUrl = (path) => {
   if (!path) return ''
   if (/^https?:/i.test(path)) return path
-  return `${API_BASE_URL}${path}`
+  const normalized = path.startsWith('/') ? path : `/${path}`
+  if (!api.defaults.baseURL) return normalized
+  return `${api.defaults.baseURL}${normalized}`
 }
 
 async function loadDiary() {

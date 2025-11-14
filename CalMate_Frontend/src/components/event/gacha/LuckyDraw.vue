@@ -275,10 +275,7 @@ import { drawReward as drawRewardFallback } from '../lib/rewardsData.js';
 import { LUCKY_DRAW_TICKET_COST } from '../lib/pointsSystem.js';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
-
-const DEFAULT_API_BASE_URL = 'http://localhost:8081';
-const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '');
-const WS_BASE_URL = (import.meta.env?.VITE_WS_BASE_URL || API_BASE_URL).replace(/\/$/, '');
+import api from '@/lib/api';
 
 const props = defineProps({
   availablePoints: {
@@ -302,6 +299,8 @@ const stompClient = ref(null);
 const subscription = ref(null);
 const stompConnected = ref(false);
 const currentTopic = ref('');
+const wsFallbackTimer = ref(null);
+const wsFallbackSyncing = ref(false);
 const showHistoryModal = ref(false);
 const historyItems = ref([]);
 const historyLoading = ref(false);
@@ -333,6 +332,8 @@ const AUTO_REROLL_BATCH = 100; // 10 x 10 automatic draws
 const AUTO_REROLL_DELAY_MS = 350;
 const BOARD_RESET_DELAY_MS = 400;
 const HISTORY_PAGE_SIZE = 12;
+const WS_PATH = '/ws-gacha';
+const WS_FALLBACK_INTERVAL_MS = 10000;
 
 const rarityConfig = {
   common: {
@@ -372,7 +373,6 @@ const DEFAULT_REWARD_IMAGE = new URL('@/assets/images/gacha/reward-default.svg',
 const rewardNameImageMap = {
   '다이아몬드 상자': rarityImageMap.legendary,
   '골드 쿠폰': rarityImageMap.epic,
-  '1000 포인트': rarityImageMap.rare,
   '100 포인트': rarityImageMap.common,
   '꽝': rarityImageMap.common,
 };
@@ -628,6 +628,31 @@ async function initializeGacha() {
     prizePool.value = [];
   } finally {
     isLoadingBoard.value = false;
+  }
+}
+
+async function refreshBoardSnapshotOnly() {
+  if (!canSyncBoard() || wsFallbackSyncing.value || isLoadingBoard.value) {
+    return;
+  }
+
+  wsFallbackSyncing.value = true;
+  try {
+    const boardResponse = await fetchMemberBoardCells(memberId.value, eventInfo.value.id);
+
+    const normalizedBoard = Array.isArray(boardResponse?.cells)
+      ? boardResponse.cells
+      : Array.isArray(boardResponse)
+        ? boardResponse
+        : [];
+
+    boardSnapshot.value =
+      !Array.isArray(boardResponse) && boardResponse ? boardResponse : boardSnapshot.value;
+    boardCells.value = normalizedBoard;
+  } catch (error) {
+    console.warn('Failed to refresh board snapshot via fallback', error);
+  } finally {
+    wsFallbackSyncing.value = false;
   }
 }
 
@@ -1109,8 +1134,9 @@ function getRewardImage(reward) {
   if (!reward) return null;
 
   const directImage = reward.imageUrl || reward.payload?.imageUrl;
-  if (isValidAssetUrl(directImage)) {
-    return directImage;
+  const resolvedDirectImage = resolveAssetUrl(directImage);
+  if (resolvedDirectImage) {
+    return resolvedDirectImage;
   }
 
   if (rewardNameImageMap[reward.name]) {
@@ -1125,12 +1151,12 @@ function getRewardImage(reward) {
   return DEFAULT_REWARD_IMAGE;
 }
 
-function isValidAssetUrl(value) {
-  if (!value || typeof value !== 'string') return false;
-  if (/^https?:\/\//i.test(value)) return true;
-  if (value.startsWith('data:')) return true;
-  if (value.startsWith('/')) return true;
-  return false;
+function resolveAssetUrl(value) {
+  if (!value || typeof value !== 'string') return null;
+  if (/^https?:\/\//i.test(value) || value.startsWith('data:')) return value;
+  const normalized = value.startsWith('/') ? value : `/${value}`;
+  if (!api.defaults.baseURL) return normalized;
+  return `${api.defaults.baseURL}${normalized}`;
 }
 
 const isBoardFullyRevealed = () => {
@@ -1217,11 +1243,38 @@ watch(
   },
 );
 
+watch(
+  stompConnected,
+  (connected) => {
+    if (connected) {
+      stopRealtimeFallback();
+    } else {
+      startRealtimeFallback();
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  [memberId, () => eventInfo.value?.id],
+  () => {
+    if (!stompConnected.value) {
+      startRealtimeFallback();
+    }
+  },
+);
+
 function connectWebSocket() {
-  // WebSocket 클라이언트 생성
-  const wsEndpoint = `${WS_BASE_URL}/ws-gacha`;
+  if (typeof window === 'undefined') return;
+  if (stompClient.value?.active) return;
+
+  const wsEndpoint = resolveWsEndpoint();
   const client = new Client({
-    webSocketFactory: () => new SockJS(wsEndpoint),
+    connectHeaders: buildWebSocketHeaders(),
+    webSocketFactory: () =>
+      new SockJS(wsEndpoint, null, {
+        withCredentials: true,
+      }),
     debug: (str) => {
       console.log('[STOMP Debug]', str);
     },
@@ -1230,7 +1283,7 @@ function connectWebSocket() {
     heartbeatOutgoing: 4000,
     onConnect: () => {
       stompConnected.value = true;
-      console.log('✅ WebSocket 연결 성공!');
+      console.log('✅ WebSocket 연결 성공!', wsEndpoint);
 
       if (eventInfo.value?.id) {
         subscribeToEventTopic(eventInfo.value.id);
@@ -1317,6 +1370,81 @@ function disconnectWebSocket() {
   console.log('🔌 WebSocket 연결 종료');
 }
 
+function getEnvValue(key) {
+  if (typeof import.meta === 'undefined' || !import.meta.env) return '';
+  return import.meta.env[key] || '';
+}
+
+function normalizeBaseUrl(value) {
+  if (!value || typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed.replace(/\/+$/, '');
+  }
+
+  if (typeof window === 'undefined') return '';
+
+  if (trimmed.startsWith('//')) {
+    return `${window.location.protocol}${trimmed}`.replace(/\/+$/, '');
+  }
+
+  if (trimmed.startsWith('/')) {
+    return `${window.location.origin}${trimmed}`.replace(/\/+$/, '');
+  }
+
+  return `${window.location.origin}/${trimmed}`.replace(/\/+$/, '');
+}
+
+function resolveWsEndpoint() {
+  const candidates = [
+    getEnvValue('VITE_WS_BASE_URL'),
+    getEnvValue('VITE_API_BASE_URL'),
+    api.defaults.baseURL,
+    typeof window !== 'undefined' ? window.location.origin : '',
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizeBaseUrl(candidate);
+    if (normalized) {
+      return `${normalized}${WS_PATH}`;
+    }
+  }
+
+  return typeof window !== 'undefined' ? `${window.location.origin}${WS_PATH}` : WS_PATH;
+}
+
+function buildWebSocketHeaders() {
+  const headers = {};
+  const tokenValue = userStore.token;
+  if (tokenValue) {
+    headers.Authorization = `Bearer ${tokenValue}`;
+  }
+  if (memberId.value) {
+    headers['X-Member-Id'] = String(memberId.value);
+  }
+  return Object.keys(headers).length ? headers : undefined;
+}
+
+function canSyncBoard() {
+  return Boolean(memberId.value && eventInfo.value?.id);
+}
+
+function startRealtimeFallback() {
+  if (wsFallbackTimer.value || !canSyncBoard()) return;
+  void refreshBoardSnapshotOnly();
+  wsFallbackTimer.value = setInterval(() => {
+    void refreshBoardSnapshotOnly();
+  }, WS_FALLBACK_INTERVAL_MS);
+}
+
+function stopRealtimeFallback() {
+  if (!wsFallbackTimer.value) return;
+  clearInterval(wsFallbackTimer.value);
+  wsFallbackTimer.value = null;
+}
+
 onBeforeUnmount(() => {
   if (rewardModalListener.value) {
     window.removeEventListener('keydown', rewardModalListener.value);
@@ -1332,6 +1460,7 @@ onBeforeUnmount(() => {
   if (boardResetTimer.value) {
     clearTimeout(boardResetTimer.value);
   }
+  stopRealtimeFallback();
   disconnectWebSocket();
 });
 </script>
