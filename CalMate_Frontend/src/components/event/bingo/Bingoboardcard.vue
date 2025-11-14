@@ -23,7 +23,7 @@
       >
         <template v-if="item.cell.photo">
           <img
-            :src="item.cell.photo.startsWith('http') ? item.cell.photo : `${api.defaults.baseURL}${item.cell.photo}`"
+            :src="resolveFileUrl(item.cell.photo)"
             :alt="item.cell.label"
             class="bingo-photo"
           />
@@ -59,6 +59,14 @@
 import { computed, defineComponent } from 'vue';
 import { POINTS_RULES } from '../lib/pointsSystem.js';
 import api from '@/lib/api';
+
+function resolveFileUrl(path) {
+  if (!path) return '';
+  if (/^https?:/i.test(path)) return path;
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  if (!api.defaults.baseURL) return normalized;
+  return `${api.defaults.baseURL}${normalized}`;
+}
 
 export default defineComponent({
   name: 'BingoBoardCard',
@@ -99,6 +107,7 @@ export default defineComponent({
       completedCount,
       POINTS_RULES,
       api,
+      resolveFileUrl,
     };
   },
 });

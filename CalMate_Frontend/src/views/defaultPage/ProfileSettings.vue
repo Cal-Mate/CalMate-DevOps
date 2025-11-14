@@ -92,6 +92,7 @@
         <div class="field">
             <label class="label">성별</label>
             <input disabled class="input" type="text"  v-model="form.gender" @blur="v('gender')" />
+            <p class="msg"></p>
         </div>
         <!-- 키 -->
         <div class="field">
@@ -234,9 +235,6 @@ onMounted(async() =>{
     form.endDate = goalData.endDate.substring(0, 10);
     form.goalType = goalData.goalType;
     form.targetValue = goalData.targetValue;
-
-
-    
   } catch (e){
     console.log(e)
   }
@@ -253,7 +251,7 @@ const form = reactive({
   weight: userStore.weight,
   email: userStore.email,
   goal: 'lose',
-  bmr: null,
+  bmr: userStore.bodyMetric,
   point : 0,
 
   endDate:'',
@@ -265,8 +263,8 @@ const form = reactive({
 
 /* ------------- 에러(고정 높이 영역에 표시) ------------- */
 const errors = reactive({
-  nickname: '', phone: '', targetValue, endDate,
-  height: '', weight: '',  bmr: '', goalLabel
+  nickname: '', phone: '', targetValue:'', endDate:'',
+  height: '', weight: '',  bmr: '', goalLabel:''
 })
 
 /* ------------- 아바타 업로드 ------------- */
@@ -319,7 +317,6 @@ async function onSelectAvatar(e){
     },300)
   } catch (err) {
     console.error(err)
-    alert('업로드 실패 :' , err)
   } finally {
     // uploading.value = false
   }
@@ -332,8 +329,21 @@ const rules = {
   height(v){ if(v===null||v===undefined||v==='') return '키를 입력하세요.'; const n=+v; return (n<50||n>250)?'키는 50~250cm':'';
   },
   weight(v){ if(v===null||v===undefined||v==='') return '체중을 입력하세요.'; const n=+v; return (n<20||n>400)?'체중은 20~400kg':'' },
-  endOfGoal(v){ return v? '':'' },
-  bmr(v){ if(v===null||v===undefined||v==='') return ''; const n=+v; if(!Number.isFinite(n)) return '숫자만 입력'; return (n<500||n>5000)?'BMR은 500~5000kcal':'' }
+  // endOfGoal(v){ return v? '':'' },
+  endDate(v){
+    if(!v) return '목표일을 선택하세요.';
+    return '';
+  },
+  bmr(v){ 
+    // if(v===null||v===undefined||v==='')
+  //  return '';
+    const n=+v; if(!Number.isFinite(n)) return '숫자만 입력'; return (n<500||n>5000)?'BMR은 500~5000kcal':'' },
+  targetValue(v){
+    if(v===null || v===undefined || v==='') return '목표 체중을 입력하세요.';
+    const n = +v;
+    return (n < 20 || n > 400) ? '목표 체중은 20~400kg' : '';
+  },
+  
 }
 function v(key){ if(rules[key]) errors[key]=rules[key](form[key]) }
 
@@ -377,16 +387,33 @@ function calcBMR(){
 /* ------------- 저장 ------------- */
 let saving=false
 const validAll = computed(()=>{
-  ['name','phone','birth','gender','height','weight','activity','bmr'].forEach(v)
+   ['nickname','phone','height','weight','endDate','targetValue','bmr'].forEach(v)
   return !Object.values(errors).some(Boolean)
 })
 async function save(){
   if(!validAll.value) return
   try{
     saving=true
-    // TODO: await api.post('/profile', { ...form, avatar })
-    alert('저장 완료(데모)')
-  } finally { saving=false }
+    await api.put('/member/member', { 
+      id : userStore.userId,
+      email : form.email,
+      nickname : form.nickname,
+      phone : form.phone,
+      weight: form.weight,
+      height: form.height,
+      bodyMetric : form.bmr,
+      goalType: form.goalType,
+      endDate : form.endDate +'T00:00:00',
+      bmr : form.bmr,
+      targetValue :form.targetValue
+    })
+    userStore.changeDataOfBody(form.nickname,form.weight, form.height ,form.phone, form.bmr )
+    success('정보수정',{description: '정보 수정이 완료 되었습니다.' });
+  } catch (e) {
+    error('정보수정',{description: '정보 수정에 실패 했습니다.' });
+    console.log(e.exceptionMessage);
+  }
+  finally { saving=false }
 }
 
 

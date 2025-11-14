@@ -45,7 +45,7 @@ const api = axios.create({
 });
 
 export const API_BASE_URL = api.defaults.baseURL;
-console.log('API_BASE_URL::' , API_BASE_URL);
+// console.log('API_BASE_URL::' , API_BASE_URL);
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -58,10 +58,10 @@ console.log('API_BASE_URL::' , API_BASE_URL);
 //                      나는 경우를 막기 위해, 리프레시/로그인 등의 URL을 제외
 // ─────────────────────────────────────────────────────────────────────────────
 let refreshPromise = null;                 // ✔ 진행 중인 리프레시 요청이 없으면 null
-let isRefreshing = false;                  // ✔ (선택) 디버깅용 플래그
+let isRefreshing = false;                  // ✔ 디버깅용 플래그
 const EXCLUDED_URLS = [                    // ✔ 인터셉터 제외 대상 URL들
   '/member/refresh',                       //    - 실제 리프레시 호출 경로
-  // '/auth/login',                           //    - 로그인 요청(환경에 맞게 추가/수정)
+  '/login',                               //    - 로그인 요청
 ];
 const refreshUrl = '/member/refresh';
 
@@ -114,6 +114,7 @@ api.interceptors.response.use(
     // 4-2-3) 인터셉터 제외 대상 URL이면(리프레시/로그인이 실패해서 또 들어온 경우 등),
     //        루프를 방지하기 위해 그대로 던진다.
     const url = original.url || '';
+    console.log('에러 처리 url:::',original.url)
     if (EXCLUDED_URLS.some((u) => url.includes(u))) {
       return Promise.reject(error);
     }

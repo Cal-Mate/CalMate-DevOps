@@ -92,6 +92,14 @@ import { useToast } from '../lib/toast.js';
 import { cancelBingoCellCheck, checkBingoCell, deleteBingoFile } from '@/api/bingo';
 import api from '@/lib/api';
 
+function resolveFileUrl(path) {
+  if (!path) return '';
+  if (/^https?:/i.test(path)) return path;
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  if (!api.defaults.baseURL) return normalized;
+  return `${api.defaults.baseURL}${normalized}`;
+}
+
 export default defineComponent({
   name: 'BingoVerificationModal',
   components: {
@@ -139,17 +147,8 @@ export default defineComponent({
 
     const previewImage = computed(() => {
       if (uploadedPreview.value) return uploadedPreview.value;
-
-      const photo = currentCell.value?.photo;
-      if (photo) {
-        return photo.startsWith('http') ? photo : `${api.defaults.baseURL}${photo}`;
-      }
-
-      const upload = currentCell.value?.uploads?.[0];
-      if (upload?.fullUrl) {
-        return upload.fullUrl.startsWith('http') ? upload.fullUrl : `${api.defaults.baseURL}${upload.fullUrl}`;
-      }
-
+      if (currentCell.value?.photo) return resolveFileUrl(currentCell.value.photo);
+      if (currentCell.value?.uploads?.[0]?.fullUrl) return resolveFileUrl(currentCell.value.uploads[0].fullUrl);
       return null;
     });
 

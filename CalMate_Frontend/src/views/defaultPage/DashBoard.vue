@@ -28,15 +28,15 @@
       <div class="coach__left">
         <div class="coach__chip">AI 코치</div>
         <p class="coach__msg">
-          <span class="coach__emoji">🌟</span>
-          오늘도 자신과의 약속을 지키셨네요! 작은 노력들이 쌓여 큰 변화를 만듭니다. 화이팅!
+          <span class="coach__emoji">{{ currentMessage.emoji }}</span>
+          {{ currentMessage.text }}
         </p>
       </div>
       <div class="coach__right">
         <button class="tiny primary" type="button">행운요소!</button>
-        <button class="tiny" type="button">🔁</button>
-        <button class="tiny" type="button">⚙</button>
-        <a class="coach__more" href="javascript:void(0)">쓴소리 듣기 →</a>
+        <a class="coach__more" href="javascript:void(0)" @click="toggleHarshMessage">
+          {{ isHarshMode ? '단소리 듣기 →' : '쓴소리 듣기 →' }}
+        </a>
       </div>
     </section>
 
@@ -177,6 +177,27 @@ const todayExerciseMinutes = ref(0)
 
 const goalKcal = computed(() => Number(userStore.bodyMetric || 0))
 const netKcal = computed(() => todayIntakeKcal.value - todayBurnKcal.value)
+
+// AI 코치 메시지 관리
+const isHarshMode = ref(false)
+
+const harshMessage = {
+  emoji: '😤',
+  text: '너 지금 운동 안 하고 있지? 그래, 그래서 네가 제자리인 거다.'
+}
+
+const encouragingMessage = {
+  emoji: '🌟',
+  text: '오늘도 자신과의 약속을 지키셨네요! 작은 노력들이 쌓여 큰 변화를 만듭니다. 화이팅!'
+}
+
+const currentMessage = computed(() => {
+  return isHarshMode.value ? harshMessage : encouragingMessage
+})
+
+const toggleHarshMessage = () => {
+  isHarshMode.value = !isHarshMode.value
+}
 
 const loadTodayStats = async () => {
   if (!userStore.userId) return
@@ -377,9 +398,15 @@ onMounted(() => {
   color: #3a4552;
   font-size: 14px;
   line-height: 1.5;
+  transition: all 0.3s ease;
 }
 .coach__emoji {
   margin-right: 6px;
+  display: inline-block;
+  transition: transform 0.3s ease;
+}
+.coach__emoji:hover {
+  transform: scale(1.2);
 }
 .coach__right {
   display: flex;
@@ -406,9 +433,16 @@ onMounted(() => {
   font-size: 12px;
   color: var(--muted);
   text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
 }
 .coach__more:hover {
   color: var(--ink);
+  transform: translateX(2px);
+}
+.coach__more:active {
+  transform: translateX(0);
 }
 
 /* 2열 그리드 */

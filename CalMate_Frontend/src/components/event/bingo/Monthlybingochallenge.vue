@@ -218,17 +218,16 @@ export default defineComponent({
 });
 
 function resolveExtendFilePathId() {
+  const baseURL = api.defaults?.baseURL || (typeof window !== 'undefined' ? window.location.origin : '');
+  if (!baseURL) return null;
+
   try {
-    console.log('[Bingo] api.defaults.baseURL:', api.defaults.baseURL);
-    const parsed = new URL(api.defaults.baseURL);
-    const host = parsed.hostname;
-    console.log('[Bingo] hostname:', host);
+    const parsed = new URL(baseURL);
+    const host = parsed.hostname || '';
 
     if (/localhost|127\.0\.0\.1/i.test(host)) {
-      console.log('[Bingo] localhost detected, returning extendFilePathId: 1');
       return 1;
     }
-    console.log('[Bingo] production environment, returning extendFilePathId: null');
   } catch (error) {
     console.warn('Failed to resolve bingo extendFilePathId from baseURL', error);
   }

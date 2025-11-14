@@ -85,7 +85,8 @@ export const useUserStore = defineStore(
     return {
       // 외부 노출용 readonly state
       name, email, roles, profile, token, isLoggedIn, userId,nickname,
-      weight, height, bodyMetric, gender, birth,phone,
+      weight, height, bodyMetric, gender, birth, phone,
+
       // actions
       logIn, logOut, changeProfile , setToken, changeDataOfBody
     }

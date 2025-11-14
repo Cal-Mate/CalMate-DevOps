@@ -99,10 +99,26 @@ const handleAiRecommend = async () => {
         sessionStorage.setItem('aiDietPlan', JSON.stringify(response.data));
         console.log('AI 추천 응답 저장 완료:', aiResponse.value);
     } catch (error) {
-        console.error('AI 추천 요청 실패:', error);
-    } finally {
-        loading.stop(); 
-    };
+    console.error('AI 추천 요청 실패:', error); // 기존 로그 (전체 객체)
+
+    if (error.response) {
+        console.error('서버 응답 상태 코드:', error.response.status); 
+        
+        console.error('서버 응답 데이터:', error.response.data); 
+        
+        if (error.response.data) {
+            alert(error.response.data);
+        } else {
+            alert('오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+        }
+    } else {
+          console.error('서버 응답 없음:', error.message);
+          alert('서버에 연결할 수 없습니다. 네트워크 상태를 확인해주세요.');
+    }
+  } finally {
+      loading.stop(); 
+  };
+
 };
 </script>
 

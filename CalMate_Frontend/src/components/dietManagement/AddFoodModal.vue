@@ -18,7 +18,9 @@
               class="field-input"
               placeholder="음식 이름을 입력하면 자동으로 검색됩니다"
               @input="onSearchInput"
+              @keyup="onSearchInput"
               @focus="onSearchFocus"
+              autocomplete="off"
             />
             <div v-if="showSearchResults && searchResults.length > 0" class="search-results">
               <div
@@ -29,7 +31,7 @@
               >
                 <div class="food-name-search">{{ food.name }}</div>
                 <div class="food-info-search">
-                  {{ food.kcal }}kcal | P:{{ food.protein }}g C:{{ food.carbo }}g F:{{ food.fat }}g
+                  {{ food.kcal }}kcal | P:{{ food.protein }}g C:{{ food.carb || food.carbo }}g F:{{ food.fat }}g
                 </div>
               </div>
             </div>
@@ -153,6 +155,7 @@
 import { reactive, ref } from 'vue'
 import closeIcon from '@/assets/images/close.png'
 import { searchFoods } from '@/api/diet'
+import { searchLocalFoods } from '@/data/foodData'
 
 const props = defineProps({
   foodData: { type: Object, default: null },
@@ -244,20 +247,56 @@ const onSearchInput = () => {
     return
   }
 
-  // 200ms 후 검색 (더 빠른 반응)
+  // 150ms 후 검색 (실시간 반응)
   searchTimeout = setTimeout(async () => {
     try {
-      const res = await searchFoods(searchKeyword.value)
-      console.log('검색 응답:', res.data)
-      searchResults.value = res.data || []
+      // 1. 먼저 로컬 데이터에서 검색 (즉시 표시)
+      const localResults = searchLocalFoods(searchKeyword.value)
+
+      // 로컬 결과를 먼저 표시
+      searchResults.value = localResults
       showSearchResults.value = true
-      console.log('searchResults 개수:', searchResults.value.length)
+
+      console.log('로컬 검색 결과:', localResults.length, '개')
+
+      // 2. 백엔드에서도 검색 (추가 데이터가 있을 수 있음)
+      let backendResults = []
+      try {
+        const res = await searchFoods(searchKeyword.value)
+        backendResults = res.data || []
+        console.log('백엔드 검색 결과:', backendResults.length, '개')
+      } catch (e) {
+        console.warn('백엔드 검색 실패, 로컬 검색 결과만 표시:', e)
+      }
+
+      // 3. 백엔드 결과가 있으면 로컬 결과와 합침 (중복 제거)
+      if (backendResults.length > 0) {
+        const combinedResults = [...localResults]
+        const localIds = new Set(localResults.map(f => f.id))
+
+        backendResults.forEach(backendFood => {
+          // 백엔드 결과가 로컬에 없으면 추가
+          if (!localIds.has(backendFood.id)) {
+            combinedResults.push(backendFood)
+          }
+        })
+
+        console.log('통합 검색 결과:', {
+          로컬: localResults.length,
+          백엔드: backendResults.length,
+          전체: combinedResults.length
+        })
+
+        searchResults.value = combinedResults
+      }
     } catch (e) {
       console.error('음식 검색 실패', e)
-      searchResults.value = []
-      showSearchResults.value = false
+      // 에러가 나도 로컬 결과는 표시
+      const localResults = searchLocalFoods(searchKeyword.value)
+      searchResults.value = localResults
+      showSearchResults.value = localResults.length > 0
     }
-  }, 200)
+  }, 150)
 }
 
 const onSearchFocus = () => {
@@ -271,7 +310,8 @@ const selectFood = (food) => {
   form.name = food.name
   form.kcal = String(food.kcal)
   form.protein = String(food.protein)
-  form.carb = String(food.carbo)
+  // 로컬 데이터는 'carbo', 백엔드 데이터는 'carb'일 수 있으므로 둘 다 지원
+  form.carb = String(food.carb || food.carbo || 0)
   form.fat = String(food.fat)
 
   searchKeyword.value = ''
