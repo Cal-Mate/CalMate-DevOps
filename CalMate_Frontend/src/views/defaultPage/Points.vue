@@ -381,11 +381,13 @@ function onStatItemClick(item) {
   }
 }
 
-function handlePointsUsed(pointsToUse) {
+async function handlePointsUsed(pointsToUse) {
   if (pointsToUse) {
     totalPoints.value = Math.max(0, totalPoints.value - pointsToUse);
   }
-  loadPointsData();
+  // 서버에서 포인트 차감이 완료될 때까지 잠시 대기
+  await new Promise(resolve => setTimeout(resolve, 500));
+  await loadPointsData();
 }
 
 function formatNumber(value) {
