@@ -60,28 +60,46 @@ import { computed, defineComponent } from 'vue';
 import { POINTS_RULES } from '../lib/pointsSystem.js';
 import api from '@/lib/api';
 
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+
 function resolveFileUrl(path) {
   if (!path) return '';
-  if (/^https?:/i.test(path)) return path;
+
+  if (/^https?:/i.test(path)) {
+    if (shouldStripLoopbackHost(path)) {
+      return toRelativeUrl(path);
+    }
+    return path;
+  }
 
   const normalized = path.startsWith('/') ? path : `/${path}`;
   const baseURL = api.defaults?.baseURL;
-  if (!baseURL) return normalized;
 
-  if (typeof window !== 'undefined') {
-    try {
-      const baseHost = new URL(baseURL).hostname;
-      const pageHost = window.location.hostname;
-      if (LOOPBACK_HOSTS.has(baseHost) && !LOOPBACK_HOSTS.has(pageHost)) {
-        return normalized;
-      }
-    } catch (error) {
-      console.warn('Failed to resolve bingo file URL', error);
-      return normalized;
-    }
+  if (!baseURL || shouldStripLoopbackHost(baseURL)) {
+    return normalized;
   }
 
   return `${baseURL}${normalized}`;
+}
+
+function shouldStripLoopbackHost(urlString) {
+  if (typeof window === 'undefined') return false;
+  try {
+    const targetHost = new URL(urlString).hostname;
+    const pageHost = window.location.hostname;
+    return LOOPBACK_HOSTS.has(targetHost) && !LOOPBACK_HOSTS.has(pageHost);
+  } catch {
+    return false;
+  }
+}
+
+function toRelativeUrl(urlString) {
+  try {
+    const url = new URL(urlString);
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return urlString;
+  }
 }
 
 export default defineComponent({
