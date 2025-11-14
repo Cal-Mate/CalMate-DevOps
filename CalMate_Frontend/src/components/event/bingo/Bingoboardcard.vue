@@ -23,7 +23,7 @@
       >
         <template v-if="item.cell.photo">
           <img
-            :src="item.cell.photo"
+            :src="item.cell.photo.startsWith('http') ? item.cell.photo : `${api.defaults.baseURL}${item.cell.photo}`"
             :alt="item.cell.label"
             class="bingo-photo"
           />
@@ -58,6 +58,7 @@
 <script>
 import { computed, defineComponent } from 'vue';
 import { POINTS_RULES } from '../lib/pointsSystem.js';
+import api from '@/lib/api';
 
 export default defineComponent({
   name: 'BingoBoardCard',
@@ -97,6 +98,7 @@ export default defineComponent({
       boardItems,
       completedCount,
       POINTS_RULES,
+      api,
     };
   },
 });

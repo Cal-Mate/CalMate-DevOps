@@ -46,8 +46,6 @@ import { useToast } from '../lib/toast.js';
 import { getCurrentYearMonthInKst } from '@/utils/date.js';
 import api from '@/lib/api';
 
-const DEFAULT_EXTEND_FILE_PATH_ID = Number(import.meta.env.VITE_BINGO_EXTEND_FILE_PATH_ID ?? '') || null;
-
 export default defineComponent({
   name: 'MonthlyBingoChallenge',
   components: {
@@ -66,7 +64,7 @@ export default defineComponent({
     const userStore = useUserStore();
     const { error } = useToast();
     const memberId = computed(() => userStore.userId || null);
-    const extendFilePathId = DEFAULT_EXTEND_FILE_PATH_ID;
+    const extendFilePathId = resolveExtendFilePathId();
     const currentMonth = getCurrentYearMonthInKst();
 
     const calculatePoints = (detail) => {
@@ -101,39 +99,17 @@ export default defineComponent({
       return Number.isFinite(parsed) ? parsed : 0;
     };
 
-    const normalizeMediaPath = (value) => {
-      if (!value || typeof value !== 'string') return null;
-      let path = value.trim();
-      if (!path) return null;
-      const uploadMatch = path.match(/^\/?upload\/\d+(.*)$/i);
-      if (uploadMatch) {
-        const remainder = uploadMatch[1] || '';
-        path = `/uploads${remainder.startsWith('/') ? remainder : `/${remainder}`}`;
-      }
-      if (!path.startsWith('/')) path = `/${path}`;
-      return path;
-    };
-
-    const resolveMediaUrl = (value) => {
-      if (!value || typeof value !== 'string') return null;
-      if (/^https?:\/\//i.test(value)) return value;
-      const normalized = normalizeMediaPath(value);
-      if (!normalized) return null;
-      return api.defaults.baseURL ? `${api.defaults.baseURL}${normalized}` : normalized;
-    };
-
     const mapCell = (cell = {}) => {
       const row = parseIndex(cell.row);
       const col = parseIndex(cell.col);
       const uploads = Array.isArray(cell.uploads) ? cell.uploads : [];
-      const rawPreview =
+      const photo =
         uploads[0]?.fullUrl ||
         uploads[0]?.url ||
         uploads[0]?.path ||
         cell.photo ||
         cell.thumbnail ||
         null;
-      const preview = resolveMediaUrl(rawPreview);
 
       return {
         id: cell.cellId ?? cell.id ?? `cell-${row}-${col}`,
@@ -145,7 +121,7 @@ export default defineComponent({
         completed: Boolean(cell.checked),
         checkedAt: cell.checkedAt ?? null,
         uploads,
-        photo: preview,
+        photo,
       };
     };
 
@@ -240,6 +216,25 @@ export default defineComponent({
     };
   },
 });
+
+function resolveExtendFilePathId() {
+  try {
+    console.log('[Bingo] api.defaults.baseURL:', api.defaults.baseURL);
+    const parsed = new URL(api.defaults.baseURL);
+    const host = parsed.hostname;
+    console.log('[Bingo] hostname:', host);
+
+    if (/localhost|127\.0\.0\.1/i.test(host)) {
+      console.log('[Bingo] localhost detected, returning extendFilePathId: 1');
+      return 1;
+    }
+    console.log('[Bingo] production environment, returning extendFilePathId: null');
+  } catch (error) {
+    console.warn('Failed to resolve bingo extendFilePathId from baseURL', error);
+  }
+
+  return null;
+}
 </script>
 
 <style scoped>

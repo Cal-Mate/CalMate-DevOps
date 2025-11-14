@@ -90,6 +90,7 @@ import Button from '../ui/Button.vue';
 import Input from '../ui/Input.vue';
 import { useToast } from '../lib/toast.js';
 import { cancelBingoCellCheck, checkBingoCell, deleteBingoFile } from '@/api/bingo';
+import api from '@/lib/api';
 
 export default defineComponent({
   name: 'BingoVerificationModal',
@@ -136,9 +137,21 @@ export default defineComponent({
       return props.board[row]?.[col] ?? null;
     });
 
-    const previewImage = computed(
-      () => uploadedPreview.value || currentCell.value?.photo || currentCell.value?.uploads?.[0]?.fullUrl || null,
-    );
+    const previewImage = computed(() => {
+      if (uploadedPreview.value) return uploadedPreview.value;
+
+      const photo = currentCell.value?.photo;
+      if (photo) {
+        return photo.startsWith('http') ? photo : `${api.defaults.baseURL}${photo}`;
+      }
+
+      const upload = currentCell.value?.uploads?.[0];
+      if (upload?.fullUrl) {
+        return upload.fullUrl.startsWith('http') ? upload.fullUrl : `${api.defaults.baseURL}${upload.fullUrl}`;
+      }
+
+      return null;
+    });
 
     watch(
       () => props.selectedCell,
