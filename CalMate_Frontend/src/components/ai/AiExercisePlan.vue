@@ -71,10 +71,10 @@ const exerciseAiRecommend = async () => {
     try {
         console.log('AI 서버로 요청을 보냅니다:', payload);
         loading.start();
-        const response = await api.post('ai/diet', payload, {timeout:35000});
+        const response = await api.post('ai/exercise', payload, {timeout:35000});
         console.log('AI summary:', response.data.summary);
         aiResponse.value = response.data;
-        sessionStorage.setItem('aiDietPlan', JSON.stringify(response.data));
+        sessionStorage.setItem('aiExercisePlan', JSON.stringify(response.data));
         console.log('AI 추천 응답 저장 완료:', aiResponse.value);
     } catch (error) {
     console.error('AI 추천 요청 실패:', error); // 기존 로그 (전체 객체)
