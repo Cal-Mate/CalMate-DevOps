@@ -73,13 +73,21 @@ export const useUserStore = defineStore(
         profile.value = newProfile;
     }
 
+    function changeDataOfBody(nick , weig , heig, phoneNumber, bmi) {
+      nickname.value = nick;
+      weight.value = weig;
+      height.value = heig;
+      phone.value = phoneNumber;
+      bodyMetric.value = bmi;
+    }
+
     // ----- 반환 -----
     return {
       // 외부 노출용 readonly state
       name, email, roles, profile, token, isLoggedIn, userId,nickname,
       weight, height, bodyMetric, gender, birth,phone,
       // actions
-      logIn, logOut, changeProfile , setToken
+      logIn, logOut, changeProfile , setToken, changeDataOfBody
     }
   },
   {
