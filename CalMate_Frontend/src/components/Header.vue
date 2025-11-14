@@ -137,6 +137,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ref } from 'vue'
 import { useUserStore } from '@/stores/user'
 import api from '@/lib/api'
+import { getDiaryByDate } from '@/api/diary'
 
 
 import mainIcon from '../assets/images/mainIcon.png'
@@ -171,15 +172,30 @@ async function handleLogout() {
   await router.push('/sign/signIn')
 }
 
-function goDiary(){
+async function goDiary() {
+  if (!userStore.userId) {
+    router.push({ name: 'main-diary' })
+    return
+  }
+
   const today = new Date()
   const key = today.toISOString().split('T')[0]
-  let entries = []
-  try { entries = JSON.parse(localStorage.getItem('journalEntries') || '[]') } catch { entries = [] }
-  const exists = Array.isArray(entries) && entries.some(e => e?.date === key)
-  if (exists) {
-    router.push({ name: 'main-diary-done', query: { date: key } })
-  } else {
+
+  try {
+    const { data } = await getDiaryByDate({
+      memberId: userStore.userId,
+      date: key
+    })
+
+    const hasDiary = Array.isArray(data) && data.length > 0
+
+    if (hasDiary) {
+      router.push({ name: 'main-diary-done', query: { date: key } })
+    } else {
+      router.push({ name: 'main-diary', query: { date: key } })
+    }
+  } catch (error) {
+    console.error('일기 확인 중 오류:', error)
     router.push({ name: 'main-diary', query: { date: key } })
   }
 }

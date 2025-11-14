@@ -30,20 +30,22 @@ const formattedTimeForKor =  () => {
   return formatted;
 }
 
-const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL || 'http://localhost:8081').replace(/\/$/, '');
 
+// api.defaults.baseURL;
 // ------------------------------------------------------------
 // 1) 전역에서 쓸 Axios 인스턴스 1개 생성
 // ------------------------------------------------------------
 const api = axios.create({
   // baseURL: API_BASE_URL,          // 모든 상대 경로 요청은 '/localhost:80'를 기준으로 보낸다. (Vite dev proxy로 백엔드 연결 가정)
   // baseURL: 'http://localhost:80/back',          // 모든 상대 경로 요청은 '/localhost:80'를 기준으로 보낸다. (Vite dev proxy로 백엔드 연결 가정)
-  baseURL: '/localhost',          // 모든 상대 경로 요청은 '/localhost:80'를 기준으로 보낸다. (Vite dev proxy로 백엔드 연결 가정)
   baseURL: '/back',          // 모든 상대 경로 요청은 '/localhost:80'를 기준으로 보낸다. (Vite dev proxy로 백엔드 연결 가정)
   // baseURL: 'http://localhost:8081',          // 모든 상대 경로 요청은 '/localhost:80'를 기준으로 보낸다. (Vite dev proxy로 백엔드 연결 가정)
   withCredentials: true,    // ✅ 브라우저가 HttpOnly 쿠키(리프레시 토큰)를 자동으로 전송하도록 허용
   timeout: 15000,           // 네트워크 요청 타임아웃(ms). 필요에 따라 조정 가능.
 });
+
+export const API_BASE_URL = api.defaults.baseURL;
+console.log('API_BASE_URL::' , API_BASE_URL);
 
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -208,6 +208,7 @@ import {
   getCalendarByDay,
   updateCalendar
 } from '@/api/calendar'
+import api from '@/lib/api'
 
 const router = useRouter()
 const route = useRoute()
@@ -267,12 +268,12 @@ watch(
   { immediate: true }
 )
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081'
-
 function resolveFileUrl(path) {
   if (!path) return ''
   if (/^https?:/i.test(path)) return path
-  return `${API_BASE_URL}${path}`
+  const normalized = path.startsWith('/') ? path : `/${path}`
+  if (!api.defaults.baseURL) return normalized
+  return `${api.defaults.baseURL}${normalized}`
 }
 
 async function loadDiary() {

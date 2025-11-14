@@ -47,7 +47,6 @@ import { getCurrentYearMonthInKst } from '@/utils/date.js';
 import api from '@/lib/api';
 
 const DEFAULT_EXTEND_FILE_PATH_ID = Number(import.meta.env.VITE_BINGO_EXTEND_FILE_PATH_ID ?? '') || null;
-const API_BASE_URL = (api.defaults.baseURL || '').replace(/\/$/, '');
 
 export default defineComponent({
   name: 'MonthlyBingoChallenge',
@@ -120,7 +119,7 @@ export default defineComponent({
       if (/^https?:\/\//i.test(value)) return value;
       const normalized = normalizeMediaPath(value);
       if (!normalized) return null;
-      return `${API_BASE_URL}${normalized}`;
+      return api.defaults.baseURL ? `${api.defaults.baseURL}${normalized}` : normalized;
     };
 
     const mapCell = (cell = {}) => {
@@ -270,9 +269,3 @@ export default defineComponent({
   cursor: pointer;
 }
 </style>
-    const resolveMediaUrl = (value) => {
-      if (!value || typeof value !== 'string') return null;
-      if (/^https?:\/\//i.test(value)) return value;
-      if (!API_BASE_URL) return value;
-      return `${API_BASE_URL}${value.startsWith('/') ? value : `/${value}`}`;
-    };
