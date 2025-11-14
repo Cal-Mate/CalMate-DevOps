@@ -59,6 +59,9 @@ import { ref, onMounted } from 'vue';
 import { useUserStore } from '@/stores/user';
 import api from '@/lib/api'
 import { useLoadingStore } from '@/stores/loading'
+import { useToast } from '@/lib/toast.js'
+
+const {error : modalerror} = useToast();
 
 const userStore = useUserStore();
 const aiResponse = ref(null);
@@ -107,13 +110,13 @@ const handleAiRecommend = async () => {
         console.error('서버 응답 데이터:', error.response.data); 
         
         if (error.response.data) {
-            alert(error.response.data);
+            modalerror('AI 호출 오류',{description: error.response.data });
         } else {
-            alert('오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+            modalerror('AI 호출 오류',{description: '호출 중 오류가 발생했습니다. 잠시 후 다시 시작해주세요.' });
         }
     } else {
           console.error('서버 응답 없음:', error.message);
-          alert('서버에 연결할 수 없습니다. 네트워크 상태를 확인해주세요.');
+          modalerror('서버 응답 없음',{description: '현재 서버에 문제가 있습니다. 잠시 후 다시 시도해주세요.' });
     }
   } finally {
       loading.stop(); 
