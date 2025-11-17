@@ -355,13 +355,7 @@ const exampleBmr = computed(()=>{
   if(!form.height || !form.weight || !age) return '-'
   return Math.round(10*+form.weight + 6.25*+form.height - 5*age + sexAdj)
 })
-const goalKcal = computed(()=>{
-  const base = Number(form.bmr) || Number(exampleBmr.value) || 0
-  if(!base || !form.activity) return 0
-  const tdee = base * Number(form.activity)
-  const adj = form.goal==='lose'?0.85 : form.goal==='gain'?1.10 : 1
-  return Math.round(tdee * adj)
-})
+const goalKcal = userStore.bodyMetric;
 
 function calcAge(ymd){
   if(!ymd) return null
