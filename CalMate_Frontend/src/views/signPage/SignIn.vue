@@ -4,7 +4,7 @@
       <div class="brand">
         <img class="brand_logo" src="@/assets/images/mainIcon.png" alt="CalMate" />
         <h1 class="brand_title">CalMate</h1>
-        <p class="brand_sub">당신만의 식단 메이커 CalMate-에 오신 것을 환영합니다.</p>
+        <p class="brand_sub">당신만의 식단 메이커 CalMate에 오신 것을 환영합니다.</p>
       </div>
 
       <form class="form" @submit.prevent="signIn">
@@ -109,10 +109,10 @@ async function signIn() {
 
 
     // 로그인 할때 고유 아이디 세션 스토리지에 저장
-    let deviceFp = localstorage.getItem('device_fp');
+    let deviceFp = localStorage.getItem('device_fp');
     if (!deviceFp) {
       deviceFp = generateDeviceFp();
-      localstorage.setItem('device_fp', deviceFp);
+      localStorage.setItem('device_fp', deviceFp);
     }
 
     const response = 
