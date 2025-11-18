@@ -176,7 +176,7 @@ api.interceptors.response.use(
                   withCredentials: true,                               // ✔ 쿠키 전송 필수
                   headers: {
                     // (선택) 서버가 UA/디바이스 바인딩 검증을 한다면 간단한 힌트로 디바이스 지문을 보낼 수 있다.
-                    'X-Device-Fp': sessionStorage.getItem('device_fp') || '',
+                    'X-Device-Fp': localstorage.getItem('device_fp') || '',
                   },
                 }
               );

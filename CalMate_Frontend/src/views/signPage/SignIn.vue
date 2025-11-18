@@ -109,10 +109,10 @@ async function signIn() {
 
 
     // 로그인 할때 고유 아이디 세션 스토리지에 저장
-    let deviceFp = sessionStorage.getItem('device_fp');
+    let deviceFp = localstorage.getItem('device_fp');
     if (!deviceFp) {
       deviceFp = generateDeviceFp();
-      sessionStorage.setItem('device_fp', deviceFp);
+      localstorage.setItem('device_fp', deviceFp);
     }
 
     const response = 

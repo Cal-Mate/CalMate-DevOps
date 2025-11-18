@@ -94,7 +94,7 @@ export const useUserStore = defineStore(
   {
     persist: {
       enabled: true, //storage 저장유무
-      storage: sessionStorage,
+      storage: localstorage,
       paths: [
         'name',
         'email',
