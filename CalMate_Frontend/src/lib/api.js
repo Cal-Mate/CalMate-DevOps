@@ -166,6 +166,7 @@ api.interceptors.response.use(
           if (!refreshPromise) {
             isRefreshing = true;                                       // ✔ (선택) 플래그 on
 
+            console.log(`리프래시토큰 요청 디바이스정보 : ${localStorage.getItem('device_fp')}`);
             // 4-2-4-2) 새 리프레시 Promise 생성
             refreshPromise = (async () => {
               // 4-2-4-2-1) /refresh 호출: withCredentials로 HttpOnly 쿠키 자동 전송
